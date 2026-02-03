@@ -1,10 +1,10 @@
+FROM alpine:3.18
 
-FROM openjdk:17-slim
+RUN apk add --no-cache openjdk17-jre
 
 WORKDIR /app
 
-ARG JAR_FILE=target/*.jar
-COPY ${JAR_FILE} app.jar
+COPY target/*.jar app.jar
 
 EXPOSE 9090
 
