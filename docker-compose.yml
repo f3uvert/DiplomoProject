@@ -1,14 +1,45 @@
+version: '3.8'
+
 services:
-  stats-server:
+  stats-db:
+    image: postgres:14-alpine
+    container_name: stats-postgres
+    environment:
+      POSTGRES_DB: stats
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U admin"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  stats-service:
+    build:
+      context: ./stats-service/stats-server
+      dockerfile: Dockerfile
+    container_name: stats-service
     ports:
       - "9090:9090"
+    environment:
+      DB_HOST: stats-db
+      DB_PORT: 5432
+      DB_NAME: stats
+      DB_USER: admin
+      DB_PASSWORD: password
+      SPRING_PROFILES_ACTIVE: prod
+    depends_on:
+      stats-db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9090/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
-  stats-db:
-    image: postgres:16.1
-
-  ewm-service:
-    ports:
-      - "8080:8080"
-
-  ewm-db:
-    image: postgres:16.1
+volumes:
+  postgres_data:
