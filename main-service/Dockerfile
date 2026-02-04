@@ -1,8 +1,7 @@
 FROM nginx:alpine
 
-# САМЫЙ ПРОСТОЙ конфиг который точно работает
-RUN echo 'events{} http { server { listen 80; location / { return 200 "OK"; } } }' > /etc/nginx/nginx.conf
+RUN echo 'events{} http { server { listen 8080; location / { return 200 "OK"; } } }' > /etc/nginx/nginx.conf
 
-EXPOSE 80
+EXPOSE 8080
 
 CMD ["nginx", "-g", "daemon off;"]
