@@ -1,7 +1,7 @@
-FROM nginx:alpine
+FROM openjdk:17-jdk-slim
 
-RUN echo 'events{} http { server { listen 8080; location / { return 200 "OK"; } } }' > /etc/nginx/nginx.conf
+COPY target/*.jar app.jar
 
 EXPOSE 8080
 
-CMD ["nginx", "-g", "daemon off;"]
+ENTRYPOINT ["java", "-jar", "/app.jar"]
