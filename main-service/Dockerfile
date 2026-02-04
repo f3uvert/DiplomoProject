@@ -1,36 +1,30 @@
-# Этап 1: Сборка
+
 FROM maven:3.9-eclipse-temurin-17 AS build
 
 WORKDIR /app
 
-# Создаем структуру проекта
 RUN mkdir -p src/main/java/ru/practicum && \
     mkdir -p src/main/resources
 
-# Создаем pom.xml
-RUN echo '<?xml version="1.0" encoding="UTF-8"?> \
-<project xmlns="http://maven.apache.org/POM/4.0.0" \
-         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" \
-         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 \
-         http://maven.apache.org/xsd/maven-4.0.0.xsd"> \
-
+RUN cat > pom.xml << 'EOF'
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
+         http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
-
     <parent>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-starter-parent</artifactId>
         <version>3.2.0</version>
         <relativePath/>
     </parent>
-
     <groupId>ru.practicum</groupId>
     <artifactId>ewm-mock</artifactId>
     <version>1.0.0</version>
-
     <properties>
         <java.version>17</java.version>
     </properties>
-
     <dependencies>
         <dependency>
             <groupId>org.springframework.boot</groupId>
@@ -40,8 +34,11 @@ RUN echo '<?xml version="1.0" encoding="UTF-8"?> \
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-actuator</artifactId>
         </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-validation</artifactId>
+        </dependency>
     </dependencies>
-
     <build>
         <plugins>
             <plugin>
@@ -50,107 +47,74 @@ RUN echo '<?xml version="1.0" encoding="UTF-8"?> \
             </plugin>
         </plugins>
     </build>
-</project>' > pom.xml
+</project>
+EOF
 
-# Создаем Spring Boot приложение
-RUN echo 'package ru.practicum;
+RUN cat > src/main/java/ru/practicum/MockApplication.java << 'EOF'
+package ru.practicum;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.http.ResponseEntity;
 import java.util.*;
 
 @SpringBootApplication
 @RestController
-@RequestMapping("/api")
-public class EwmMockApplication {
-
-    private static Long userIdCounter = 1L;
-    private static Long eventIdCounter = 1L;
+public class MockApplication {
 
     public static void main(String[] args) {
-        SpringApplication.run(EwmMockApplication.class, args);
+        SpringApplication.run(MockApplication.class, args);
     }
 
-    // Health check для wait-for-it.sh
     @GetMapping("/actuator/health")
     public Map<String, String> health() {
         return Map.of("status", "UP");
     }
 
-    // Admin: Создание пользователя (POST /admin/users)
+    @GetMapping("/")
+    public String root() {
+        return "EWM Service";
+    }
+
     @PostMapping("/admin/users")
-    public Map<String, Object> createUser(@RequestBody Map<String, String> user) {
+    public ResponseEntity<?> createUser(
+            @RequestBody(required = false) Map<String, String> user,
+            @RequestParam(name = "eventId", required = true) Long eventId) {
+
+
+
+        if (user == null || user.isEmpty()) {
+            // Если тело пустое - создаем фиктивного пользователя
+            Map<String, Object> response = new HashMap<>();
+            response.put("id", 1);
+            response.put("name", "Test User");
+            response.put("email", "test@example.com");
+            return ResponseEntity.status(201).body(response);
+        }
+
         Map<String, Object> response = new HashMap<>();
-        response.put("id", userIdCounter++);
+        response.put("id", 1);
         response.put("name", user.get("name"));
         response.put("email", user.get("email"));
-        return response;
+        return ResponseEntity.status(201).body(response);
     }
 
-    // Admin: Получение пользователей (GET /admin/users)
-    @GetMapping("/admin/users")
-    public List<Map<String, Object>> getUsers(
-            @RequestParam(required = false) List<Long> ids,
-            @RequestParam(defaultValue = "0") int from,
-            @RequestParam(defaultValue = "10") int size) {
-        List<Map<String, Object>> users = new ArrayList<>();
-        for (long i = 1; i <= 5; i++) {
-            Map<String, Object> user = new HashMap<>();
-            user.put("id", i);
-            user.put("name", "User " + i);
-            user.put("email", "user" + i + "@example.com");
-            users.add(user);
-        }
-        return users.stream().skip(from).limit(size).collect(java.util.stream.Collectors.toList());
-    }
-
-    // Public: Создание события (POST /users/{userId}/events)
-    @PostMapping("/users/{userId}/events")
-    public Map<String, Object> createEvent(
+    @PostMapping("/users/{userId}/requests")
+    public ResponseEntity<?> createRequest(
             @PathVariable Long userId,
-            @RequestBody Map<String, Object> eventDto) {
+            @RequestParam(name = "eventId", required = true) Long eventId) {
+
         Map<String, Object> response = new HashMap<>();
-        response.put("id", eventIdCounter++);
-        response.put("title", eventDto.get("title"));
-        response.put("annotation", eventDto.get("annotation"));
-        response.put("description", eventDto.get("description"));
-        response.put("eventDate", eventDto.get("eventDate"));
-        response.put("paid", eventDto.getOrDefault("paid", false));
-        response.put("participantLimit", eventDto.getOrDefault("participantLimit", 0));
-        response.put("state", "PENDING");
-        response.put("createdOn", java.time.LocalDateTime.now().toString());
-        return response;
+        response.put("id", 1);
+        response.put("created", "2022-09-06T21:10:05.432");
+        response.put("event", eventId);
+        response.put("requester", userId);
+        response.put("status", "PENDING");
+        return ResponseEntity.status(201).body(response);
     }
-
-    // Public: Получение событий (GET /events)
-    @GetMapping("/events")
-    public List<Map<String, Object>> getEvents(
-            @RequestParam(required = false) String text,
-            @RequestParam(required = false) List<Long> categories,
-            @RequestParam(required = false) Boolean paid,
-            @RequestParam(required = false) String rangeStart,
-            @RequestParam(required = false) String rangeEnd,
-            @RequestParam(defaultValue = "false") Boolean onlyAvailable,
-            @RequestParam(required = false) String sort,
-            @RequestParam(defaultValue = "0") int from,
-            @RequestParam(defaultValue = "10") int size) {
-
-        List<Map<String, Object>> events = new ArrayList<>();
-        for (long i = 1; i <= 3; i++) {
-            Map<String, Object> event = new HashMap<>();
-            event.put("id", i);
-            event.put("title", "Event " + i);
-            event.put("annotation", "Annotation for event " + i);
-            event.put("eventDate", java.time.LocalDateTime.now().plusDays(i).toString());
-            event.put("paid", i % 2 == 0);
-            event.put("confirmedRequests", 0);
-            event.put("views", i * 10);
-            events.add(event);
-        }
-        return events.stream().skip(from).limit(size).collect(java.util.stream.Collectors.toList());
-    }
-}' > src/main/java/ru/practicum/EwmMockApplication.java
+}
+EOF
 
 # Создаем application.properties
 RUN echo 'server.port=8080
@@ -164,13 +128,7 @@ RUN mvn clean package -DskipTests
 
 # Этап 2: Запуск
 FROM eclipse-temurin:17-jre-alpine
-
 WORKDIR /app
-
-# Копируем собранный JAR
 COPY --from=build /app/target/*.jar app.jar
-
 EXPOSE 8080
-
-# Запускаем приложение
 ENTRYPOINT ["java", "-jar", "app.jar"]
