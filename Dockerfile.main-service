@@ -2,49 +2,25 @@
 FROM maven:3.8.4-eclipse-temurin-17 AS build
 WORKDIR /app
 
-# 1. Копируем только pom.xml
+# 1. Копируем только корневой pom.xml
 COPY pom.xml .
 
 # 2. Копируем модуль main-service
 COPY main-service/pom.xml main-service/pom.xml
 COPY main-service/src main-service/src
 
-# 3. Создаем директории для модуля stats-client (если нужно)
-RUN mkdir -p stats-client/src/main/java/ru/practicum/client && \
-    echo '<?xml version="1.0" encoding="UTF-8"?>
-<project xmlns="http://maven.apache.org/POM/4.0.0"
-         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
-         http://maven.apache.org/xsd/maven-4.0.0.xsd">
-    <modelVersion>4.0.0</modelVersion>
-    <parent>
-        <groupId>ru.practicum</groupId>
-        <artifactId>explore-with-me</artifactId>
-        <version>0.0.1-SNAPSHOT</version>
-    </parent>
-    <artifactId>stats-client</artifactId>
-    <dependencies>
-        <dependency>
-            <groupId>org.springframework</groupId>
-            <artifactId>spring-web</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>com.fasterxml.jackson.core</groupId>
-            <artifactId>jackson-databind</artifactId>
-        </dependency>
-    </dependencies>
-</project>' > stats-client/pom.xml
+# 3. Копируем stats-service и его подмодули
+COPY stats-service/pom.xml stats-service/pom.xml
+COPY stats-service/stats-client/pom.xml stats-service/stats-client/pom.xml
+COPY stats-service/stats-client/src stats-service/stats-client/src
+COPY stats-service/stats-dto/pom.xml stats-service/stats-dto/pom.xml
+COPY stats-service/stats-dto/src stats-service/stats-dto/src
 
-# 4. Копируем код клиента (если он есть в репозитории)
-# Если папка существует, копируем, если нет - игнорируем
-COPY --from=context /stats-client/pom.xml stats-client/pom.xml 2>/dev/null || echo "stats-client/pom.xml not found, using default"
-COPY --from=context /stats-client/src stats-client/src 2>/dev/null || echo "stats-client/src not found, using default"
-
-# 5. Собираем только main-service
+# 4. Собираем проект
 RUN mvn clean package -pl main-service -am -DskipTests
 
 FROM eclipse-temurin:17-jre-alpine
 WORKDIR /app
 COPY --from=build /app/main-service/target/*.jar app.jar
 EXPOSE 8080
-ENTRYPOINT ["java", "-jar", "app.jar"]
+ENTPOINT ["java", "-jar", "app.jar"]
