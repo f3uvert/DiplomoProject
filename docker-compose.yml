@@ -66,10 +66,13 @@ services:
       nginx -g 'daemon off;'
       "
   ewm-main-service:
-    build: ./main-service
+    build:
+      context: .  # контекст - корень проекта
+      dockerfile: Dockerfile.main-service
     container_name: ewm-main-service
     ports:
       - "8080:8080"
+    # ... остальное без изменений
     depends_on:
       ewm-db:
         condition: service_healthy

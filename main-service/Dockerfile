@@ -1,23 +1,25 @@
-# Используйте родительский образ для Java 17
-FROM eclipse-temurin:17-jdk-alpine
+# Stage 1: Build
+FROM maven:3.8.4-eclipse-temurin-17 AS build
+WORKDIR /build
 
-# Установите Maven для сборки
-RUN apk add --no-cache maven
+# Копируем ВЕСЬ проект (из корня)
+COPY ../pom.xml ./pom.xml
+COPY ../main-service ./main-service
+COPY ../stats-client ./stats-client  # если есть
 
-WORKDIR /app
+# Сначала собираем родительский pom
+RUN mvn clean install -N -DskipTests
 
-# Копируем исходный код
-COPY pom.xml .
-COPY src ./src
-
-# Собираем проект
+# Затем собираем main-service
+WORKDIR /build/main-service
 RUN mvn clean package -DskipTests
 
-# Копируем собранный JAR
-RUN cp target/*.jar app.jar
+# Stage 2: Run
+FROM eclipse-temurin:17-jre-alpine
+WORKDIR /app
 
-# Удаляем исходный код чтобы уменьшить размер образа
-RUN rm -rf src pom.xml target
+# Копируем собранный JAR
+COPY --from=build /build/main-service/target/*.jar app.jar
 
 EXPOSE 8080
 
