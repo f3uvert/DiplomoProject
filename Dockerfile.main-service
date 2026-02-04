@@ -1,15 +1,16 @@
+# Stage 1: Build
 FROM maven:3.8.4-eclipse-temurin-17 AS build
 WORKDIR /app
 
-# Копируем все файлы проекта
+# Копируем только необходимые файлы
 COPY pom.xml .
 COPY main-service/pom.xml main-service/pom.xml
-COPY stats-client/pom.xml stats-client/pom.xml  # если нужно
 COPY main-service/src main-service/src
 
-# Собираем проект
+# Собираем проект (только main-service и его зависимости)
 RUN mvn clean package -pl main-service -am -DskipTests
 
+# Stage 2: Run
 FROM eclipse-temurin:17-jre-alpine
 WORKDIR /app
 COPY --from=build /app/main-service/target/*.jar app.jar
