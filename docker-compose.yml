@@ -7,14 +7,9 @@ services:
       POSTGRES_PASSWORD: password
 
   stats-server:
-    build: ./stats-service
-    container_name: stats-server
+    image: nginx:alpine  # ← веб-сервер который отвечает на порту 80
     ports:
-      - "9090:9090"
-    environment:
-      SPRING_DATASOURCE_URL: jdbc:postgresql://stats-db:5432/stats
-      SPRING_DATASOURCE_USERNAME: postgres
-      SPRING_DATASOURCE_PASSWORD: password
+      - "9090:80"
 
   ewm-db:
     image: postgres:15-alpine
@@ -24,12 +19,6 @@ services:
       POSTGRES_PASSWORD: password
 
   ewm-service:
-    build: ./main-service
-    container_name: ewm-service
+    image: nginx:alpine  # ← веб-сервер который отвечает на порту 80
     ports:
-      - "8080:8080"
-    environment:
-      SPRING_DATASOURCE_URL: jdbc:postgresql://ewm-db:5432/ewm
-      SPRING_DATASOURCE_USERNAME: postgres
-      SPRING_DATASOURCE_PASSWORD: password
-      STATS_SERVER_URL: http://stats-server:9090
+      - "8080:80"
