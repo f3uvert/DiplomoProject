@@ -1,13 +1,30 @@
+version: '3.8'
+
 services:
+  ewm-db:
+    image: postgres:14-alpine
+    container_name: ewm-db
+    environment:
+      POSTGRES_DB: ewm_main_db
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: password
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U admin"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   stats-db:
     image: postgres:14-alpine
     container_name: stats-db
     environment:
-      POSTGRES_DB: ewm_stats_db      # ← измените название
+      POSTGRES_DB: ewm_stats_db
       POSTGRES_USER: admin
       POSTGRES_PASSWORD: password
     ports:
-      - "5433:5432"                  # ← добавьте порт
+      - "5433:5432"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U admin"]
       interval: 10s
@@ -31,58 +48,24 @@ services:
       nginx -g 'daemon off;'
       "
 
-  ewm-db:
-    image: postgres:14-alpine
-    container_name: ewm-db
-    environment:
-      POSTGRES_DB: ewm_main_db
-      POSTGRES_USER: admin
-      POSTGRES_PASSWORD: password
-    ports:
-      - "5432:5432"
-    healthcheck:
-      test: [ "CMD-SHELL", "pg_isready -U admin" ]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-
-  ewm-service:
-    image: nginx:alpine
-    container_name: ewm-service
-    ports:
-      - "8081:80"
-    command: >
-      sh -c "
-      echo 'server {
-        listen 80;
-        location / {
-          return 200 \"EWM Service\";
-        }
-        location /actuator/health {
-          add_header Content-Type application/json;
-          return 200 \"{\\\"status\\\":\\\"UP\\\"}\";
-        }
-      }' > /etc/nginx/conf.d/default.conf &&
-      nginx -g 'daemon off;'
-      "
   ewm-main-service:
     build:
       context: .
       dockerfile: Dockerfile.main-service
-      container_name: ewm-main-service
-      ports:
-        - "8080:8080"
-      depends_on:
-        ewm-db:
-          condition: service_healthy
-      environment:
-        SPRING_PROFILES_ACTIVE: docker
-        SPRING_DATASOURCE_URL: jdbc:postgresql://ewm-db:5432/ewm_main_db
-        SPRING_DATASOURCE_USERNAME: admin
-        SPRING_DATASOURCE_PASSWORD: password
-      healthcheck:
-        test: [ "CMD", "curl", "-f", "http://localhost:8080/actuator/health" ]
-        interval: 30s
-        timeout: 10s
-        retries: 3
-        start_period: 40s
+    container_name: ewm-main-service  # ← ЭТО ДОЛЖНО БЫТЬ ЗДЕСЬ, а не в build
+    ports:                           # ← ЭТО ДОЛЖНО БЫТЬ ЗДЕСЬ
+      - "8080:8080"
+    depends_on:                      # ← ЭТО ДОЛЖНО БЫТЬ ЗДЕСЬ
+      ewm-db:
+        condition: service_healthy
+    environment:                     # ← ЭТО ДОЛЖНО БЫТЬ ЗДЕСЬ
+      SPRING_PROFILES_ACTIVE: docker
+      SPRING_DATASOURCE_URL: jdbc:postgresql://ewm-db:5432/ewm_main_db
+      SPRING_DATASOURCE_USERNAME: admin
+      SPRING_DATASOURCE_PASSWORD: password
+    healthcheck:                     # ← ЭТО ДОЛЖНО БЫТЬ ЗДЕСЬ
+      test: [ "CMD", "curl", "-f", "http://localhost:8080/actuator/health" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
