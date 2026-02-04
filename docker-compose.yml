@@ -69,7 +69,7 @@ services:
     build: ./main-service
     container_name: ewm-main-service
     ports:
-      - "8080:8080"
+      - "8080:80"
     depends_on:
       ewm-db:
         condition: service_healthy
