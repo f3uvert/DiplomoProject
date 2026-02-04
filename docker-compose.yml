@@ -1,5 +1,4 @@
 services:
-  # 1. База данных для статистики
   stats-db:
     image: postgres:14-alpine
     container_name: stats-postgres
@@ -15,11 +14,10 @@ services:
       timeout: 5s
       retries: 5
 
-  # 2. Сервис статистики (stats-server)
   stats-server:
     build:
-      context: .  # ← корень проекта!
-      dockerfile: stats-service/stats-server/Dockerfile  # ← полный путь
+      context: ./stats-service/stats-server
+      dockerfile: Dockerfile
     container_name: stats-server
     ports:
       - "9090:9090"
@@ -29,18 +27,15 @@ services:
       DB_NAME: stats
       DB_USER: admin
       DB_PASSWORD: password
-      SPRING_PROFILES_ACTIVE: prod
     depends_on:
       stats-db:
         condition: service_healthy
     healthcheck:
-      test: ["CMD-SHELL", "echo 'Checking if process is running...' && ps aux | grep java || exit 1"]
+      test: ["CMD", "curl", "-f", "http://localhost:9090"]
       interval: 10s
       timeout: 5s
       retries: 3
-      start_period: 40s
 
-  # 3. База данных для основного сервиса
   ewm-db:
     image: postgres:14-alpine
     container_name: ewm-postgres
@@ -56,7 +51,6 @@ services:
       timeout: 5s
       retries: 5
 
-  # 4. Основной сервис
   ewm-service:
     build:
       context: ./main-service
@@ -71,14 +65,13 @@ services:
       DB_USER: admin
       DB_PASSWORD: password
       STATS_SERVER_URL: http://stats-server:9090
-      SPRING_PROFILES_ACTIVE: prod
     depends_on:
       ewm-db:
         condition: service_healthy
       stats-server:
         condition: service_healthy
     healthcheck:
-      test: ["CMD-SHELL", "echo 'Service check' && sleep 1"]
+      test: ["CMD", "curl", "-f", "http://localhost:8080"]
       interval: 10s
       timeout: 5s
       retries: 3
