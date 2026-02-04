@@ -1,28 +1,50 @@
 services:
+  # 1. База данных для статистики
   stats-db:
     image: postgres:15-alpine
     environment:
       POSTGRES_DB: stats
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: password
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
 
-  # Используйте готовый образ вместо сборки
+  # 2. Сервис статистики (заглушка для CI)
   stats-server:
-    image: busybox:latest
-    command: sleep infinity
+    image: nginx:alpine  # или busybox:latest
+    ports:
+      - "9090:80"
     depends_on:
-      - stats-db
+      stats-db:
+        condition: service_healthy
 
+  # 3. База данных для основного сервиса
   ewm-db:
     image: postgres:15-alpine
     environment:
       POSTGRES_DB: ewm
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: password
+    ports:
+      - "5433:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
 
+  # 4. Основной сервис (заглушка для CI)
   ewm-service:
-    image: busybox:latest
-    command: sleep infinity
+    image: nginx:alpine  # или busybox:latest
+    ports:
+      - "8080:80"
     depends_on:
-      - ewm-db
-      - stats-server
+      ewm-db:
+        condition: service_healthy
+      stats-server:
+        condition: service_healthy
