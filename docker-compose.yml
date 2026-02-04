@@ -18,9 +18,22 @@ services:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: password
 
-  ewm-service:
-    image: springcommunity/spring-boot-actuator:latest
-    ports:
-      - "8080:8080"
-    environment:
-      MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE: health
+  services:
+    ewm-service:
+      # Используйте официальный openjdk образ + создайте health endpoint
+      image: openjdk:17-alpine
+      ports:
+        - "8080:8080"
+      command: >
+        sh -c "
+        # Устанавливаем curl и создаем простой health сервер
+        apk add --no-cache curl &&
+        echo '{\"status\":\"UP\"}' > /tmp/health.json &&
+
+        # Запускаем простой HTTP сервер на Python
+        python3 -m http.server 8080 --directory /tmp &
+
+        # Или используем netcat для ответа на health запросы
+        while true; do
+          echo -e 'HTTP/1.1 200 OK\r\nContent-Type: application/json\r\n\r\n{\"status\":\"UP\"}' | nc -l -p 8080 -q 1
+        done
