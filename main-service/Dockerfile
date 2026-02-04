@@ -1,17 +1,24 @@
-# Вариант 1: Используйте eclipse-temurin (рекомендуется)
+# Используйте родительский образ для Java 17
 FROM eclipse-temurin:17-jdk-alpine
 
-# Вариант 2: Или используйте slim версию с явным тегом
-# FROM openjdk:17-slim
+# Установите Maven для сборки
+RUN apk add --no-cache maven
 
-# Создаем рабочую директорию
 WORKDIR /app
 
-# Копируем JAR файл
-COPY target/*.jar app.jar
+# Копируем исходный код
+COPY pom.xml .
+COPY src ./src
 
-# Открываем порт
+# Собираем проект
+RUN mvn clean package -DskipTests
+
+# Копируем собранный JAR
+RUN cp target/*.jar app.jar
+
+# Удаляем исходный код чтобы уменьшить размер образа
+RUN rm -rf src pom.xml target
+
 EXPOSE 8080
 
-# Запускаем приложение
 ENTRYPOINT ["java", "-jar", "app.jar"]

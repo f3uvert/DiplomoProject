@@ -66,9 +66,7 @@ services:
       nginx -g 'daemon off;'
       "
   ewm-main-service:
-    build:
-      context: ./main-service
-      dockerfile: Dockerfile
+    build: ./main-service
     container_name: ewm-main-service
     ports:
       - "8080:8080"
@@ -76,12 +74,17 @@ services:
       ewm-db:
         condition: service_healthy
     environment:
+      # Указываем Spring использовать профиль docker
+      SPRING_PROFILES_ACTIVE: docker
+      # Или напрямую переменные
       SPRING_DATASOURCE_URL: jdbc:postgresql://ewm-db:5432/ewm_main_db
       SPRING_DATASOURCE_USERNAME: admin
       SPRING_DATASOURCE_PASSWORD: password
+      SERVER_PORT: 8080
     # Добавьте healthcheck
     healthcheck:
       test: [ "CMD", "curl", "-f", "http://localhost:8080/actuator/health" ]
       interval: 30s
       timeout: 10s
       retries: 3
+      start_period: 40s
