@@ -50,7 +50,7 @@ services:
     image: nginx:alpine
     container_name: ewm-service
     ports:
-      - "8080:80"
+      - "8081:80"
     command: >
       sh -c "
       echo 'server {
