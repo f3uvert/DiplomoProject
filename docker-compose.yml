@@ -1,55 +1,49 @@
 services:
   stats-db:
     image: postgres:14-alpine
-    container_name: stats-postgres
     environment:
       POSTGRES_DB: stats
       POSTGRES_USER: admin
       POSTGRES_PASSWORD: password
-    ports:
-      - "5432:5432"
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U admin"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
 
   stats-server:
-    image: busybox:latest
-    container_name: stats-server
+    image: nginx:alpine
     ports:
-      - "9090:9090"
-    command: tail -f /dev/null
-    # НЕТ healthcheck для busybox!
-    depends_on:
-      - stats-db
+      - "9090:80"
+    command: >
+      sh -c "
+      echo 'server {
+        listen 80;
+        location /actuator/health {
+          add_header Content-Type application/json;
+          return 200 \"{\\\"status\\\":\\\"UP\\\"}\";
+        }
+      }' > /etc/nginx/conf.d/default.conf &&
+      nginx -g 'daemon off;'
+      "
 
   ewm-db:
     image: postgres:14-alpine
-    container_name: ewm-postgres
     environment:
       POSTGRES_DB: ewm
       POSTGRES_USER: admin
       POSTGRES_PASSWORD: password
-    ports:
-      - "5433:5432"
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U admin"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
 
   ewm-service:
-    image: busybox:latest
-    container_name: ewm-service
+    image: nginx:alpine
     ports:
-      - "8080:8080"
-    command: tail -f /dev/null
-    # НЕТ healthcheck для busybox!
-    depends_on:
-      - ewm-db
-      - stats-server
-
-volumes:
-  postgres_stats_data:
-  postgres_ewm_data:
+      - "8080:80"
+    command: >
+      sh -c "
+      echo 'server {
+        listen 80;
+        location / {
+          return 200 \"EWM Service\";
+        }
+        location /actuator/health {
+          add_header Content-Type application/json;
+          return 200 \"{\\\"status\\\":\\\"UP\\\"}\";
+        }
+      }' > /etc/nginx/conf.d/default.conf &&
+      nginx -g 'daemon off;'
+      "
