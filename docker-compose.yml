@@ -1,37 +1,17 @@
-version: '3.8'
-
 services:
   stats-db:
-    image: postgres:14-alpine
-    container_name: stats-postgres
-    environment:
-      POSTGRES_DB: stats
-      POSTGRES_USER: admin
-      POSTGRES_PASSWORD: password
-    ports:
-      - "5432:5432"
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U admin"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
+  # ... без изменений
 
-  stats-service:
-    build:
-      context: ./stats-service/stats-server
-      dockerfile: Dockerfile
-    container_name: stats-service
+  # Измените имя с stats-service на stats-server
+  stats-server:  # ← было stats-service
+    build: ./stats-service
+    container_name: stats-server  # ← измените
     ports:
       - "9090:9090"
     environment:
-      DB_HOST: stats-db
-      DB_PORT: 5432
-      DB_NAME: stats
-      DB_USER: admin
-      DB_PASSWORD: password
-      SPRING_PROFILES_ACTIVE: prod
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://stats-db:5432/stats
+      - SPRING_DATASOURCE_USERNAME=postgres
+      - SPRING_DATASOURCE_PASSWORD=password
     depends_on:
       stats-db:
         condition: service_healthy
@@ -41,5 +21,29 @@ services:
       timeout: 10s
       retries: 3
 
-volumes:
-  postgres_data:
+  ewm-db:
+  # ... без изменений
+
+  # Основной сервис уже правильно назван ewm-service
+  ewm-service:
+    build: ./main-service
+    container_name: ewm-service
+    ports:
+      - "8080:8080"
+    environment:
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://ewm-db:5432/ewm
+      - SPRING_DATASOURCE_USERNAME=postgres
+      - SPRING_DATASOURCE_PASSWORD=password
+      - STATS_SERVER_URL=http://stats-server:9090  # ← обновите если поменяли имя
+      - SPRING_JPA_HIBERNATE_DDL_AUTO=update
+      - SPRING_JPA_SHOW_SQL=true
+    depends_on:
+      ewm-db:
+        condition: service_healthy
+      stats-server:  # ← обновите если поменяли имя
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
