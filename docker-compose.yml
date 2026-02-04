@@ -1,5 +1,4 @@
 services:
-  # 1. База данных для статистики
   stats-db:
     image: postgres:15-alpine
     environment:
@@ -14,16 +13,20 @@ services:
       timeout: 5s
       retries: 5
 
-  # 2. Сервис статистики (заглушка для CI)
   stats-server:
-    image: nginx:alpine  # или busybox:latest
+    build: ./stats-service
     ports:
       - "9090:80"
     depends_on:
       stats-db:
         condition: service_healthy
+    healthcheck:  # ← ДОБАВЬТЕ ЭТО
+      test: ["CMD", "curl", "-f", "http://localhost:80 || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
 
-  # 3. База данных для основного сервиса
   ewm-db:
     image: postgres:15-alpine
     environment:
@@ -38,13 +41,18 @@ services:
       timeout: 5s
       retries: 5
 
-  # 4. Основной сервис (заглушка для CI)
   ewm-service:
-    image: nginx:alpine  # или busybox:latest
+    build: ./main-service
     ports:
       - "8080:80"
     depends_on:
       ewm-db:
         condition: service_healthy
-      stats-server:
+      stats-server:  # ← этот сервис ждет healthcheck
         condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:80 || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
