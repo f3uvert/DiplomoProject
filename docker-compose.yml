@@ -18,8 +18,8 @@ services:
   # 2. Сервис статистики (stats-server)
   stats-server:
     build:
-      context: ./stats-service/stats-server  # ← правильный путь!
-      dockerfile: Dockerfile
+      context: .  # ← корень проекта!
+      dockerfile: stats-service/stats-server/Dockerfile  # ← полный путь
     container_name: stats-server
     ports:
       - "9090:9090"
