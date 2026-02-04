@@ -1,5 +1,6 @@
 version: '3.8'
 services:
+
   stats-db:
     image: postgres:15-alpine
     container_name: stats-db
@@ -35,5 +36,50 @@ services:
       timeout: 10s
       retries: 3
 
+  ewm-db:
+    image: postgres:15-alpine
+    container_name: ewm-db
+    ports:
+      - "5433:5432"
+    environment:
+      - POSTGRES_DB=ewm
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=password
+    volumes:
+      - ewm-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+
+  ewm-service:
+    build: ./main-service
+    container_name: ewm-service
+    ports:
+      - "8080:8080"
+    environment:
+
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://ewm-db:5432/ewm
+      - SPRING_DATASOURCE_USERNAME=postgres
+      - SPRING_DATASOURCE_PASSWORD=password
+
+      - STATS_SERVER_URL=http://stats-service:9090
+
+      - SPRING_JPA_HIBERNATE_DDL_AUTO=update
+      - SPRING_JPA_SHOW_SQL=true
+    depends_on:
+      ewm-db:
+        condition: service_healthy
+      stats-service:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
 volumes:
   stats-data:
+  ewm-data:

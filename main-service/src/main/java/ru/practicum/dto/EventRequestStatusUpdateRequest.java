@@ -22,7 +22,7 @@ public class EventRequestStatusUpdateRequest {
     private Status status;
 
     public enum Status {
-        CONFIRMED,  // Подтверждено
-        REJECTED    // Отклонено
+        CONFIRMED,
+        REJECTED
     }
 }

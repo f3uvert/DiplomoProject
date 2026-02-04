@@ -20,12 +20,12 @@ public class EventFullDto {
     private Long confirmedRequests;
 
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
-    private String createdOn; // Исправлено: было LocalDateTime, должно быть String
+    private String createdOn;
 
     private String description;
 
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
-    private String eventDate; // Исправлено: было LocalDateTime, должно быть String
+    private String eventDate;
 
     private UserShortDto initiator;
     private LocationDto location;
@@ -33,7 +33,7 @@ public class EventFullDto {
     private Integer participantLimit;
 
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
-    private String publishedOn; // Исправлено: было LocalDateTime, должно быть String
+    private String publishedOn;
 
     private Boolean requestModeration;
     private String state;

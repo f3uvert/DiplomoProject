@@ -18,7 +18,6 @@ public class EventMapper {
     private final UserMapper userMapper;
 
     public Event toEntity(NewEventDto dto, Category category, User initiator) {
-        // Конвертируем LocationDto в Location entity
         Location location = null;
         if (dto.getLocation() != null) {
             location = Location.builder()
@@ -43,7 +42,6 @@ public class EventMapper {
     }
 
     public EventFullDto toFullDto(Event entity) {
-        // Конвертируем Location entity в LocationDto
         LocationDto locationDto = null;
         if (entity.getLocation() != null) {
             locationDto = LocationDto.builder()

@@ -28,7 +28,6 @@ public class CategoryServiceImpl implements CategoryService {
     @Override
     @Transactional
     public CategoryDto createCategory(NewCategoryDto categoryDto) {
-        // Проверка уникальности имени
         if (categoryRepository.existsByName(categoryDto.getName())) {
             throw new ConflictException("Category name already exists");
         }
@@ -44,7 +43,6 @@ public class CategoryServiceImpl implements CategoryService {
         Category category = categoryRepository.findById(catId)
                 .orElseThrow(() -> new NotFoundException("Category with id=" + catId + " was not found"));
 
-        // Проверка, что категория не используется в событиях
         if (eventRepository.existsByCategoryId(catId)) {
             throw new ConflictException("The category is not empty");
         }
@@ -58,7 +56,6 @@ public class CategoryServiceImpl implements CategoryService {
         Category category = categoryRepository.findById(catId)
                 .orElseThrow(() -> new NotFoundException("Category with id=" + catId + " was not found"));
 
-        // Проверка уникальности имени (если изменилось)
         if (!category.getName().equals(categoryDto.getName()) &&
                 categoryRepository.existsByName(categoryDto.getName())) {
             throw new ConflictException("Category name already exists");

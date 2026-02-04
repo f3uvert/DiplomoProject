@@ -32,25 +32,20 @@ public class RequestServiceImpl implements RequestService {
     @Override
     @Transactional
     public ParticipationRequestDto createParticipationRequest(Long userId, Long eventId) {
-        // 1. Проверка пользователя
         User requester = userRepository.findById(userId)
                 .orElseThrow(() -> new NotFoundException("User not found"));
 
-        // 2. Проверка события
         Event event = eventRepository.findById(eventId)
                 .orElseThrow(() -> new NotFoundException("Event not found"));
 
-        // 3. Проверка: инициатор не может подать заявку на свое событие
         if (event.getInitiator().getId().equals(userId)) {
             throw new ConflictException("Initiator cannot request participation in own event");
         }
 
-        // 4. Проверка: событие должно быть опубликовано
         if (event.getState() != Event.EventState.PUBLISHED) {
             throw new ConflictException("Cannot participate in unpublished event");
         }
 
-        // 5. Проверка: лимит участников
         if (event.getParticipantLimit() > 0) {
             long confirmedRequests = requestRepository.countByEventIdAndStatus(
                     eventId, ParticipationRequest.Status.CONFIRMED
@@ -60,15 +55,12 @@ public class RequestServiceImpl implements RequestService {
             }
         }
 
-        // 6. Проверка: повторная заявка
         if (requestRepository.existsByRequesterIdAndEventId(userId, eventId)) {
             throw new ConflictException("Request already exists");
         }
 
-        // 7. Создание заявки
         ParticipationRequest request = requestMapper.toEntity(event, (ru.practicum.entity.User) requester);
 
-        // 8. Если не требуется модерация или лимит = 0 - автоматическое подтверждение
         if (!event.getRequestModeration() || event.getParticipantLimit() == 0) {
             request.setStatus(ParticipationRequest.Status.CONFIRMED);
             // Обновляем счетчик подтвержденных заявок в событии
@@ -98,7 +90,6 @@ public class RequestServiceImpl implements RequestService {
                 .orElseThrow(() -> new NotFoundException("Request not found"));
 
         if (request.getStatus() == ParticipationRequest.Status.CONFIRMED) {
-            // Уменьшаем счетчик подтвержденных заявок
             Event event = request.getEvent();
             event.setConfirmedRequests(event.getConfirmedRequests() - 1);
             eventRepository.save(event);
@@ -111,7 +102,6 @@ public class RequestServiceImpl implements RequestService {
 
     @Override
     public List<ParticipationRequestDto> getEventParticipants(Long userId, Long eventId) {
-        // Проверяем, что событие принадлежит пользователю
         eventRepository.findByIdAndInitiatorId(eventId, userId)
                 .orElseThrow(() -> new NotFoundException("Event not found or not owned by user"));
 
@@ -127,17 +117,14 @@ public class RequestServiceImpl implements RequestService {
         Event event = eventRepository.findByIdAndInitiatorId(eventId, userId)
                 .orElseThrow(() -> new NotFoundException("Event not found or not owned by user"));
 
-        // Получаем заявки для обновления
         List<ParticipationRequest> requests = requestRepository.findByIdIn(updateRequest.getRequestIds());
 
-        // Проверяем, что все заявки в состоянии PENDING
         requests.forEach(request -> {
             if (request.getStatus() != ParticipationRequest.Status.PENDING) {
                 throw new ConflictException("Request must have status PENDING");
             }
         });
 
-        // Проверяем лимит участников
         AtomicLong confirmedCount = new AtomicLong(requestRepository.countByEventIdAndStatus(
                 eventId, ParticipationRequest.Status.CONFIRMED
         ));
@@ -149,7 +136,6 @@ public class RequestServiceImpl implements RequestService {
             }
         }
 
-        // Обновляем статусы
         List<ParticipationRequestDto> confirmed = requests.stream()
                 .filter(request -> {
                     if (updateRequest.getStatus() == EventRequestStatusUpdateRequest.Status.CONFIRMED) {

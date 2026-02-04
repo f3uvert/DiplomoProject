@@ -31,7 +31,6 @@ public class CompilationServiceImpl implements CompilationService {
     @Override
     @Transactional
     public CompilationDto createCompilation(NewCompilationDto compilationDto) {
-        // Получаем события для подборки
         Set<Event> events = new HashSet<>();
         if (compilationDto.getEvents() != null && !compilationDto.getEvents().isEmpty()) {
             events = new HashSet<>(eventRepository.findAllById(compilationDto.getEvents()));
@@ -57,18 +56,15 @@ public class CompilationServiceImpl implements CompilationService {
         Compilation compilation = compilationRepository.findById(compId)
                 .orElseThrow(() -> new NotFoundException("Compilation with id=" + compId + " was not found"));
 
-        // Обновляем события, если предоставлены
         if (updateRequest.getEvents() != null) {
             Set<Event> events = new HashSet<>(eventRepository.findAllById(updateRequest.getEvents()));
             compilation.setEvents(events);
         }
 
-        // Обновляем pinned, если предоставлено
         if (updateRequest.getPinned() != null) {
             compilation.setPinned(updateRequest.getPinned());
         }
 
-        // Обновляем title, если предоставлено
         if (updateRequest.getTitle() != null && !updateRequest.getTitle().isBlank()) {
             compilation.setTitle(updateRequest.getTitle());
         }

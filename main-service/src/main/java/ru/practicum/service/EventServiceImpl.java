@@ -43,15 +43,12 @@ public class EventServiceImpl implements EventService {
     @Override
     @Transactional
     public EventFullDto createEvent(Long userId, NewEventDto eventDto) {
-        // 1. Проверка пользователя
         User initiator = userRepository.findById(userId)
                 .orElseThrow(() -> new NotFoundException("User not found"));
 
-        // 2. Проверка категории
         Category category = categoryRepository.findById(eventDto.getCategory())
                 .orElseThrow(() -> new NotFoundException("Category not found"));
 
-        // 3. Проверка даты (не раньше чем через 2 часа)
         LocalDateTime eventDate = LocalDateTime.parse(eventDto.getEventDate(),
                 DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
 
@@ -59,7 +56,6 @@ public class EventServiceImpl implements EventService {
             throw new ValidationException("Event date must be at least 2 hours from now");
         }
 
-        // 4. Создание события
         Event event = eventMapper.toEntity(eventDto, category, initiator);
         Event savedEvent = eventRepository.save(event);
 
@@ -91,16 +87,13 @@ public class EventServiceImpl implements EventService {
         Event event = eventRepository.findByIdAndInitiatorId(eventId, userId)
                 .orElseThrow(() -> new NotFoundException("Event not found"));
 
-        // Проверка состояния события
         if (event.getState() != Event.EventState.PENDING &&
                 event.getState() != Event.EventState.CANCELED) {
             throw new ConflictException("Only pending or canceled events can be changed");
         }
 
-        // Обновление полей
         updateEventFields(event, updateRequest);
 
-        // Если отмена - устанавливаем состояние CANCELED
         if (updateRequest.getStateAction() != null &&
                 updateRequest.getStateAction() == UpdateEventUserRequest.StateAction.CANCEL_REVIEW) {
             event.setState(Event.EventState.CANCELED);
@@ -131,19 +124,15 @@ public class EventServiceImpl implements EventService {
         Event event = eventRepository.findById(eventId)
                 .orElseThrow(() -> new NotFoundException("Event not found"));
 
-        // Проверка даты публикации (только если eventDate указан в запросе)
         if (updateRequest.getEventDate() != null) {
-            // В UpdateEventAdminRequest eventDate - это LocalDateTime, не нужно парсить
             LocalDateTime newEventDate = updateRequest.getEventDate();
             if (newEventDate.isBefore(LocalDateTime.now().plusHours(1))) {
                 throw new ConflictException("Event date must be at least 1 hour from publication");
             }
         }
 
-        // Обновление полей
         updateEventFields(event, updateRequest);
 
-        // Обработка публикации/отклонения
         if (updateRequest.getStateAction() != null) {
             if (updateRequest.getStateAction() == UpdateEventAdminRequest.StateAction.PUBLISH_EVENT) {
                 if (event.getState() != Event.EventState.PENDING) {
@@ -165,18 +154,15 @@ public class EventServiceImpl implements EventService {
 
     @Override
     public EventFullDto getPublicEvent(Long eventId, HttpServletRequest request) {
-        // 1. Получение события (только опубликованного)
         Event event = eventRepository.findByIdAndState(eventId, Event.EventState.PUBLISHED)
                 .orElseThrow(() -> new NotFoundException("Event not found"));
 
-        // 2. Отправка статистики
         statsClient.hit(
                 "ewm-main-service",
                 request.getRequestURI(),
                 request.getRemoteAddr()
         );
 
-        // 3. Получение количества просмотров
         Long views = getEventViews(eventId);
         event.setViews(views);
 
@@ -188,27 +174,22 @@ public class EventServiceImpl implements EventService {
                                                LocalDateTime rangeStart, LocalDateTime rangeEnd,
                                                Boolean onlyAvailable, String sort,
                                                int from, int size, HttpServletRequest request) {
-        // 1. Отправка статистики
         statsClient.hit(
                 "ewm-main-service",
                 request.getRequestURI(),
                 request.getRemoteAddr()
         );
 
-        // 2. Построение запроса
         Pageable pageable = buildPageable(sort, from, size);
 
-        // 3. Выполнение запроса
         List<Event> events = eventRepository.findPublicEvents(
                 text, categories, paid, rangeStart, rangeEnd, onlyAvailable, pageable
         );
 
-        // 4. Получение просмотров для каждого события
         Map<Long, Long> viewsMap = getEventsViews(
                 events.stream().map(Event::getId).collect(Collectors.toList())
         );
 
-        // 5. Маппинг в DTO
         return events.stream()
                 .map(event -> {
                     event.setViews(viewsMap.getOrDefault(event.getId(), 0L));
@@ -217,7 +198,6 @@ public class EventServiceImpl implements EventService {
                 .collect(Collectors.toList());
     }
 
-    // Вспомогательные методы
 
     private Long getEventViews(Long eventId) {
         LocalDateTime start = LocalDateTime.now().minusYears(1);
@@ -258,7 +238,6 @@ public class EventServiceImpl implements EventService {
     }
 
     private Pageable buildPageable(String sort, int from, int size) {
-        // Реализация сортировки
         if ("EVENT_DATE".equals(sort)) {
             return PageRequest.of(from / size, size, Sort.by("eventDate").ascending());
         } else if ("VIEWS".equals(sort)) {
@@ -269,7 +248,6 @@ public class EventServiceImpl implements EventService {
     }
 
     private void updateEventFields(Event event, UpdateEventUserRequest updateRequest) {
-        // Реализация обновления полей - ТОЛЬКО строковые поля проверяем на пустоту
         if (updateRequest.getAnnotation() != null && !updateRequest.getAnnotation().trim().isEmpty()) {
             event.setAnnotation(updateRequest.getAnnotation());
         }
@@ -281,18 +259,15 @@ public class EventServiceImpl implements EventService {
         if (updateRequest.getDescription() != null && !updateRequest.getDescription().trim().isEmpty()) {
             event.setDescription(updateRequest.getDescription());
         }
-        // Для eventDate в UpdateEventUserRequest это String
         if (updateRequest.getEventDate() != null && !updateRequest.getEventDate().trim().isEmpty()) {
             LocalDateTime eventDate = LocalDateTime.parse(updateRequest.getEventDate(),
                     DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
-            // Проверка что новая дата не раньше чем через 2 часа
             if (eventDate.isBefore(LocalDateTime.now().plusHours(2))) {
                 throw new ValidationException("Event date must be at least 2 hours from now");
             }
             event.setEventDate(eventDate);
         }
         if (updateRequest.getLocation() != null) {
-            // Конвертируем LocationDto в Location entity
             Location location = Location.builder()
                     .lat(updateRequest.getLocation().getLat())
                     .lon(updateRequest.getLocation().getLon())
@@ -312,14 +287,12 @@ public class EventServiceImpl implements EventService {
             event.setTitle(updateRequest.getTitle());
         }
 
-        // Если SEND_TO_REVIEW - меняем состояние на PENDING
         if (updateRequest.getStateAction() == UpdateEventUserRequest.StateAction.SEND_TO_REVIEW) {
             event.setState(Event.EventState.PENDING);
         }
     }
 
     private void updateEventFields(Event event, UpdateEventAdminRequest updateRequest) {
-        // Реализация обновления полей для админа
         if (updateRequest.getAnnotation() != null && !updateRequest.getAnnotation().trim().isEmpty()) {
             event.setAnnotation(updateRequest.getAnnotation());
         }
@@ -331,13 +304,11 @@ public class EventServiceImpl implements EventService {
         if (updateRequest.getDescription() != null && !updateRequest.getDescription().trim().isEmpty()) {
             event.setDescription(updateRequest.getDescription());
         }
-        // Для eventDate в UpdateEventAdminRequest это LocalDateTime (не String)
         if (updateRequest.getEventDate() != null) {
             LocalDateTime eventDate = updateRequest.getEventDate();
             event.setEventDate(eventDate);
         }
         if (updateRequest.getLocation() != null) {
-            // Конвертируем LocationDto в Location entity
             Location location = Location.builder()
                     .lat(updateRequest.getLocation().getLat())
                     .lon(updateRequest.getLocation().getLon())

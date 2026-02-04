@@ -18,7 +18,7 @@ public class EventShortDto {
     private Long confirmedRequests;
 
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
-    private String eventDate; // Исправлено: было LocalDateTime, должно быть String
+    private String eventDate;
 
     private UserShortDto initiator;
     private Boolean paid;

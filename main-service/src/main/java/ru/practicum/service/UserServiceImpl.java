@@ -26,7 +26,6 @@ public class UserServiceImpl implements UserService {
     @Override
     @Transactional
     public UserDto createUser(NewUserRequest userRequest) {
-        // Проверка уникальности email
         if (userRepository.existsByEmail(userRequest.getEmail())) {
             throw new ConflictException("Email already exists");
         }

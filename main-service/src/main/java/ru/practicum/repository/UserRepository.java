@@ -14,10 +14,8 @@ import java.util.List;
 public interface UserRepository extends JpaRepository<User, Long> {
     boolean existsByEmail(String email);
 
-    // Исправленный метод с @Query
     @Query("SELECT u FROM User u WHERE (:ids IS NULL OR u.id IN :ids)")
     List<User> findAllByIdIn(@Param("ids") List<Long> ids, Pageable pageable);
 
-    // Или используйте встроенный метод
     List<User> findAllByIdIn(List<Long> ids);
 }
