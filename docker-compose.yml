@@ -76,7 +76,7 @@ services:
     environment:
       # Указываем Spring использовать профиль docker
       SPRING_PROFILES_ACTIVE: docker
-      # Или напрямую переменные
+
       SPRING_DATASOURCE_URL: jdbc:postgresql://ewm-db:5432/ewm_main_db
       SPRING_DATASOURCE_USERNAME: admin
       SPRING_DATASOURCE_PASSWORD: password
