@@ -14,7 +14,6 @@ public class MainServiceApp {
 
     @Bean
     public StatsClient statsClient() {
-        // URL сервиса статистики - измените на нужный
         return new StatsClient("http://localhost:9090");
     }
 }
