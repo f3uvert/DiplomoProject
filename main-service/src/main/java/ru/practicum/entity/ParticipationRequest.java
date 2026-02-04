@@ -1,0 +1,39 @@
+package ru.practicum.entity;
+
+import jakarta.persistence.*;
+import lombok.*;
+
+import java.time.LocalDateTime;
+
+@Entity
+@Table(name = "participation_requests")
+@Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
+public class ParticipationRequest {
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    @Column(name = "created")
+    @Builder.Default
+    private LocalDateTime created = LocalDateTime.now();
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "event_id", nullable = false)
+    private Event event;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "requester_id", nullable = false)
+    private User requester;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    @Builder.Default
+    private Status status = Status.PENDING;
+
+    public enum Status {
+        PENDING, CONFIRMED, REJECTED, CANCELED
+    }
+}
