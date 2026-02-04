@@ -14,11 +14,14 @@ RUN sed -i '/<module>stats-service<\/module>/d' pom.xml || \
 COPY main-service/pom.xml main-service/pom.xml
 COPY main-service/src main-service/src
 
-# 4. Если есть stats-client, копируем его
-COPY stats-client/pom.xml stats-client/pom.xml 2>/dev/null || echo "stats-client not found"
-COPY stats-client/src stats-client/src 2>/dev/null || echo "stats-client src not found"
+# 4. Если есть stats-client, копируем его (исправленный синтаксис)
+COPY stats-client/pom.xml stats-client/pom.xml
+COPY stats-client/src stats-client/src
 
-# 5. Собираем проект
+# 5. Если файлов нет, игнорируем ошибки
+RUN if [ ! -f stats-client/pom.xml ]; then echo "stats-client not found, skipping"; fi
+
+# 6. Собираем проект
 RUN mvn clean package -pl main-service -am -DskipTests
 
 # Stage 2: Run
