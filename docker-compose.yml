@@ -1,13 +1,22 @@
 services:
   stats-db:
     image: postgres:14-alpine
+    container_name: stats-db
     environment:
-      POSTGRES_DB: stats
+      POSTGRES_DB: ewm_stats_db      # ← измените название
       POSTGRES_USER: admin
       POSTGRES_PASSWORD: password
+    ports:
+      - "5433:5432"                  # ← добавьте порт
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U admin"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   stats-server:
     image: nginx:alpine
+    container_name: stats-server
     ports:
       - "9090:80"
     command: >
@@ -24,13 +33,22 @@ services:
 
   ewm-db:
     image: postgres:14-alpine
+    container_name: ewm-db
     environment:
-      POSTGRES_DB: ewm
+      POSTGRES_DB: ewm_main_db        # ← ТОЧНО такое же название как в application.properties!
       POSTGRES_USER: admin
       POSTGRES_PASSWORD: password
+    ports:
+      - "5432:5432"                   # ← стандартный порт PostgreSQL
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U admin"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   ewm-service:
     image: nginx:alpine
+    container_name: ewm-service
     ports:
       - "8080:80"
     command: >
