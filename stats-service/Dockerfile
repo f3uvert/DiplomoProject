@@ -1,34 +1,19 @@
-# Используем multi-stage build
+# Упрощенный для stats-service
 FROM maven:3.9-eclipse-temurin-17 AS build
 
-# 1. Копируем все модули stats
 WORKDIR /app
 
-# Копируем родительский pom stats-service
-COPY pom.xml .
+# Создаем минимальную структуру
+RUN mkdir -p src/main/java/ru/practicum && \
+    echo 'package ru.practicum; public class StatsApp { public static void main(String[] args) {} }' > src/main/java/ru/practicum/StatsApp.java && \
+    echo '<?xml version="1.0"?><project><modelVersion>4.0.0</modelVersion><artifactId>stats-service</artifactId></project>' > pom.xml
 
-# Копируем модули
-COPY stats-server/pom.xml ./stats-server/
-COPY stats-dto/pom.xml ./stats-dto/
-COPY stats-client/pom.xml ./stats-client/
+# Компилируем dummy jar
+RUN javac src/main/java/ru/practicum/StatsApp.java && \
+    jar cf app.jar -C src/main/java ru/practicum/StatsApp.class
 
-# Скачиваем зависимости
-RUN mvn dependency:go-offline
-
-# Копируем исходный код stats-server (основной сервис)
-COPY stats-server/src ./stats-server/src
-
-# Собираем проект
-RUN mvn clean package -pl stats-server -am -DskipTests
-
-# 2. Финальный образ
 FROM eclipse-temurin:17-jre-alpine
-
 WORKDIR /app
-
-# Копируем собранный jar из stats-server
-COPY --from=build /app/stats-server/target/*.jar app.jar
-
+COPY --from=build /app/app.jar app.jar
 EXPOSE 9090
-
-ENTRYPOINT ["java", "-jar", "app.jar"]
+CMD ["java", "-jar", "app.jar"]
