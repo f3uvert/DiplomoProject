@@ -1,13 +1,24 @@
-# Stage 1: Build
+# Dockerfile.main-service в корне проекта
 FROM maven:3.8.4-eclipse-temurin-17 AS build
 WORKDIR /app
 
-# Копируем только необходимые файлы
+# 1. Копируем родительский pom.xml
 COPY pom.xml .
+
+# 2. Удаляем или комментируем модуль stats-service из pom.xml
+RUN sed -i '/<module>stats-service<\/module>/d' pom.xml || \
+    sed -i 's/<module>stats-service<\/module>/<!-- <module>stats-service<\/module> -->/g' pom.xml || \
+    echo "Could not modify pom.xml, continuing..."
+
+# 3. Копируем main-service
 COPY main-service/pom.xml main-service/pom.xml
 COPY main-service/src main-service/src
 
-# Собираем проект (только main-service и его зависимости)
+# 4. Если есть stats-client, копируем его
+COPY stats-client/pom.xml stats-client/pom.xml 2>/dev/null || echo "stats-client not found"
+COPY stats-client/src stats-client/src 2>/dev/null || echo "stats-client src not found"
+
+# 5. Собираем проект
 RUN mvn clean package -pl main-service -am -DskipTests
 
 # Stage 2: Run
