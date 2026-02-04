@@ -19,6 +19,8 @@ services:
       POSTGRES_PASSWORD: password
 
   ewm-service:
-    image: nginx:alpine  # ← веб-сервер который отвечает на порту 80
+    image: springcommunity/spring-boot-actuator:latest
     ports:
-      - "8080:80"
+      - "8080:8080"
+    environment:
+      MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE: health
