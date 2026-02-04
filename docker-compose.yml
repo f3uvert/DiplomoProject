@@ -65,3 +65,15 @@ services:
       }' > /etc/nginx/conf.d/default.conf &&
       nginx -g 'daemon off;'
       "
+  ewm-main-service:
+    build: ./main-service
+    container_name: ewm-main-service
+    ports:
+      - "8080:8080"
+    depends_on:
+      ewm-db:
+        condition: service_healthy
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://ewm-db:5432/ewm_main_db
+      SPRING_DATASOURCE_USERNAME: admin
+      SPRING_DATASOURCE_PASSWORD: password
