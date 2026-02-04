@@ -1,10 +1,11 @@
-# Абсолютно минимальный Dockerfile
-FROM alpine:latest
+FROM alpine:3.18
 
-# Не пытаемся ничего копировать
-RUN echo "Creating main service container"
+RUN apk add --no-cache openjdk17-jre
 
 WORKDIR /app
 
-# Просто запускаем бесконечный sleep
-CMD echo "Main Service is running" && sleep infinity
+COPY target/*.jar app.jar
+
+EXPOSE 8080
+
+ENTRYPOINT ["java", "-jar", "app.jar"]

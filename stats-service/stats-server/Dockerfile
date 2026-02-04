@@ -1,24 +1,11 @@
-# main-service/Dockerfile - должен создавать /actuator/health endpoint
-FROM openjdk:17-alpine
+FROM alpine:3.18
 
-# Устанавливаем curl и создаем health endpoint
-RUN apk add --no-cache curl && \
-    mkdir -p /app && \
-    echo '{"status":"UP"}' > /app/health.json
+RUN apk add --no-cache openjdk17-jre
 
 WORKDIR /app
 
-# Запускаем HTTP сервер который отвечает на /actuator/health
-CMD ["sh", "-c", "
-  # Создаем index.html для корня
-  echo 'EWM Service' > index.html
+COPY target/*.jar app.jar
 
-  # Запускаем Python HTTP сервер
-  python3 -m http.server 8080 &
+EXPOSE 9090
 
-  # Или используем busybox httpd
-  # httpd -p 8080 -h /app &
-
-  # Ждем вечно
-  sleep infinity
-"]
+ENTRYPOINT ["java", "-jar", "app.jar"]
