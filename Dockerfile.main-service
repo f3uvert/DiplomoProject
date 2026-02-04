@@ -1,30 +1,48 @@
-# Dockerfile.main-service в корне проекта
+# Dockerfile.main-service
 FROM maven:3.8.4-eclipse-temurin-17 AS build
 WORKDIR /app
 
-# 1. Копируем родительский pom.xml
+# 1. Копируем только pom.xml
 COPY pom.xml .
 
-# 2. Удаляем или комментируем модуль stats-service из pom.xml
-RUN sed -i '/<module>stats-service<\/module>/d' pom.xml || \
-    sed -i 's/<module>stats-service<\/module>/<!-- <module>stats-service<\/module> -->/g' pom.xml || \
-    echo "Could not modify pom.xml, continuing..."
-
-# 3. Копируем main-service
+# 2. Копируем модуль main-service
 COPY main-service/pom.xml main-service/pom.xml
 COPY main-service/src main-service/src
 
-# 4. Если есть stats-client, копируем его (исправленный синтаксис)
-COPY stats-client/pom.xml stats-client/pom.xml
-COPY stats-client/src stats-client/src
+# 3. Создаем директории для модуля stats-client (если нужно)
+RUN mkdir -p stats-client/src/main/java/ru/practicum/client && \
+    echo '<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
+         http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <parent>
+        <groupId>ru.practicum</groupId>
+        <artifactId>explore-with-me</artifactId>
+        <version>0.0.1-SNAPSHOT</version>
+    </parent>
+    <artifactId>stats-client</artifactId>
+    <dependencies>
+        <dependency>
+            <groupId>org.springframework</groupId>
+            <artifactId>spring-web</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-databind</artifactId>
+        </dependency>
+    </dependencies>
+</project>' > stats-client/pom.xml
 
-# 5. Если файлов нет, игнорируем ошибки
-RUN if [ ! -f stats-client/pom.xml ]; then echo "stats-client not found, skipping"; fi
+# 4. Копируем код клиента (если он есть в репозитории)
+# Если папка существует, копируем, если нет - игнорируем
+COPY --from=context /stats-client/pom.xml stats-client/pom.xml 2>/dev/null || echo "stats-client/pom.xml not found, using default"
+COPY --from=context /stats-client/src stats-client/src 2>/dev/null || echo "stats-client/src not found, using default"
 
-# 6. Собираем проект
+# 5. Собираем только main-service
 RUN mvn clean package -pl main-service -am -DskipTests
 
-# Stage 2: Run
 FROM eclipse-temurin:17-jre-alpine
 WORKDIR /app
 COPY --from=build /app/main-service/target/*.jar app.jar
