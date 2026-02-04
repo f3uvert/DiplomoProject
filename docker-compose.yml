@@ -1,39 +1,93 @@
+version: '3.8'
+
 services:
+  # 1. База данных для статистики (уже есть)
   stats-db:
-    image: postgres:15-alpine
+    image: postgres:14-alpine
+    container_name: stats-postgres
     environment:
       POSTGRES_DB: stats
-      POSTGRES_USER: postgres
+      POSTGRES_USER: admin
       POSTGRES_PASSWORD: password
-
-  stats-server:
-    image: nginx:alpine  # ← веб-сервер который отвечает на порту 80
     ports:
-      - "9090:80"
+      - "5432:5432"
+    volumes:
+      - postgres_stats_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U admin"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
+  # 2. Сервис статистики (уже есть)
+  stats-service:
+    build:
+      context: ./stats-service/stats-server
+      dockerfile: Dockerfile
+    container_name: stats-service
+    ports:
+      - "9090:9090"
+    environment:
+      DB_HOST: stats-db
+      DB_PORT: 5432
+      DB_NAME: stats
+      DB_USER: admin
+      DB_PASSWORD: password
+      SPRING_PROFILES_ACTIVE: prod
+    depends_on:
+      stats-db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9090/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # 3. База данных для основного сервиса (ДОБАВЬТЕ ЭТО)
   ewm-db:
-    image: postgres:15-alpine
+    image: postgres:14-alpine
+    container_name: ewm-postgres
     environment:
       POSTGRES_DB: ewm
-      POSTGRES_USER: postgres
+      POSTGRES_USER: admin
       POSTGRES_PASSWORD: password
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_ewm_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U admin"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
-  services:
-    ewm-service:
-      # Используйте официальный openjdk образ + создайте health endpoint
-      image: openjdk:17-alpine
-      ports:
-        - "8080:8080"
-      command: >
-        sh -c "
-        # Устанавливаем curl и создаем простой health сервер
-        apk add --no-cache curl &&
-        echo '{\"status\":\"UP\"}' > /tmp/health.json &&
+  # 4. Основной сервис (ДОБАВЬТЕ ЭТО)
+  ewm-service:
+    build:
+      context: ./main-service
+      dockerfile: Dockerfile
+    container_name: ewm-service
+    ports:
+      - "8080:8080"
+    environment:
+      DB_HOST: ewm-db
+      DB_PORT: 5432
+      DB_NAME: ewm
+      DB_USER: admin
+      DB_PASSWORD: password
+      STATS_SERVER_URL: http://stats-service:9090
+      SPRING_PROFILES_ACTIVE: prod
+    depends_on:
+      ewm-db:
+        condition: service_healthy
+      stats-service:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
-        # Запускаем простой HTTP сервер на Python
-        python3 -m http.server 8080 --directory /tmp &
-
-        # Или используем netcat для ответа на health запросы
-        while true; do
-          echo -e 'HTTP/1.1 200 OK\r\nContent-Type: application/json\r\n\r\n{\"status\":\"UP\"}' | nc -l -p 8080 -q 1
-        done
+volumes:
+  postgres_stats_data:
+  postgres_ewm_data:
