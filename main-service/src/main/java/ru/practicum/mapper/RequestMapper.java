@@ -6,9 +6,6 @@ import ru.practicum.entity.Event;
 import ru.practicum.entity.ParticipationRequest;
 import ru.practicum.entity.User;
 
-import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
-
 @Component
 public class RequestMapper {
     public ParticipationRequest toEntity(Event event, User requester) {
@@ -24,16 +21,8 @@ public class RequestMapper {
                 .id(entity.getId())
                 .event(entity.getEvent().getId())
                 .requester(entity.getRequester().getId())
-                .created(entity.getCreated() != null ?
-                        entity.getCreated().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")) : null)
+                .created(entity.getCreated())
                 .status(entity.getStatus().name())
                 .build();
-    }
-
-    private String formatDateTime(LocalDateTime dateTime) {
-        if (dateTime == null) {
-            return null;
-        }
-        return dateTime.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
     }
 }
