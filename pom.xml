@@ -18,12 +18,11 @@
         <module>stats-service</module>
     </modules>
 
-    <!-- Вариант 1: Используем Spring Boot как parent (рекомендуется) -->
     <parent>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-starter-parent</artifactId>
-        <version>3.2.0</version>  <!-- или 3.3.2, 3.1.5 - какая у вас версия -->
-        <relativePath/> <!-- lookup parent from repository -->
+        <version>3.2.0</version>
+        <relativePath/>
     </parent>
 
     <properties>
@@ -31,24 +30,68 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <maven.compiler.source>17</maven.compiler.source>
         <maven.compiler.target>17</maven.compiler.target>
+
+        <!-- Плагины для checkstyle -->
+        <checkstyle.version>3.2.0</checkstyle.version>
+        <maven-checkstyle-plugin.version>3.2.0</maven-checkstyle-plugin.version>
     </properties>
 
-    <!-- Общие зависимости для ВСЕХ модулей -->
+    <!-- Профили -->
+    <profiles>
+        <profile>
+            <id>check</id>
+            <build>
+                <plugins>
+                    <!-- Проверка стиля кода -->
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-checkstyle-plugin</artifactId>
+                        <version>${maven-checkstyle-plugin.version}</version>
+                        <configuration>
+                            <configLocation>checkstyle.xml</configLocation>
+                            <includeTestSourceDirectory>true</includeTestSourceDirectory>
+                        </configuration>
+                        <executions>
+                            <execution>
+                                <goals>
+                                    <goal>check</goal>
+                                </goals>
+                            </execution>
+                        </executions>
+                    </plugin>
+
+                    <!-- Проверка зависимостей -->
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-dependency-plugin</artifactId>
+                        <version>3.6.0</version>
+                        <executions>
+                            <execution>
+                                <goals>
+                                    <goal>analyze</goal>
+                                </goals>
+                            </execution>
+                        </executions>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+    </profiles>
+
     <dependencyManagement>
         <dependencies>
-            <!-- Управление версиями зависимостей -->
+            <!-- Общие зависимости можно указать здесь -->
         </dependencies>
     </dependencyManagement>
 
     <dependencies>
-        <!-- Только ОБЩИЕ зависимости, которые нужны ВСЕМ модулям -->
+        <!-- Только ОБЩИЕ зависимости для всех модулей -->
         <dependency>
             <groupId>org.projectlombok</groupId>
             <artifactId>lombok</artifactId>
             <optional>true</optional>
         </dependency>
 
-        <!-- Тесты - будут у всех модулей -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-test</artifactId>
@@ -58,7 +101,7 @@
 
     <build>
         <plugins>
-            <!-- Плагины для всех модулей -->
+            <!-- Spring Boot Maven Plugin для сборки -->
             <plugin>
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>
@@ -69,6 +112,24 @@
                             <artifactId>lombok</artifactId>
                         </exclude>
                     </excludes>
+                </configuration>
+            </plugin>
+
+            <!-- Компилятор Java -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <version>3.11.0</version>
+                <configuration>
+                    <source>${java.version}</source>
+                    <target>${java.version}</target>
+                    <annotationProcessorPaths>
+                        <path>
+                            <groupId>org.projectlombok</groupId>
+                            <artifactId>lombok</artifactId>
+                            <version>${lombok.version}</version>
+                        </path>
+                    </annotationProcessorPaths>
                 </configuration>
             </plugin>
         </plugins>
