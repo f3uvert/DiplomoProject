@@ -206,6 +206,13 @@ public class EventServiceImpl implements EventService {
                 events.stream().map(Event::getId).collect(Collectors.toList())
         );
 
+        if (Boolean.TRUE.equals(onlyAvailable)) {
+            events = events.stream()
+                    .filter(event -> event.getParticipantLimit() == 0 ||
+                            event.getConfirmedRequests() < event.getParticipantLimit())
+                    .collect(Collectors.toList());
+        }
+
         return events.stream()
                 .map(event -> {
                     event.setViews(viewsMap.getOrDefault(event.getId(), 0L));
