@@ -1,7 +1,6 @@
 services:
   ewm-db:
     image: postgres:14-alpine
-    container_name: ewm-db
     environment:
       POSTGRES_DB: ewm_main_db
       POSTGRES_USER: admin
@@ -16,7 +15,6 @@ services:
 
   stats-db:
     image: postgres:14-alpine
-    container_name: stats-db
     environment:
       POSTGRES_DB: ewm_stats_db
       POSTGRES_USER: admin
@@ -32,7 +30,7 @@ services:
   stats-server:
     build:
       context: .  # корень проекта
-      dockerfile: stats-service/stats-server/Dockerfile
+      dockerfile: docker/stats-server/Dockerfile
     container_name: stats-server
     ports:
       - "9090:9090"
@@ -47,7 +45,7 @@ services:
   ewm-main-service:
     build:
       context: .  # корень проекта
-      dockerfile: docker-build/main-service/Dockerfile
+      dockerfile: docker/main-service/Dockerfile
     container_name: ewm-main-service
     ports:
       - "8080:8080"
