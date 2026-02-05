@@ -54,6 +54,7 @@ public interface EventRepository extends JpaRepository<Event, Long> {
     List<Event> findPublishedEventsByDateRange(@Param("rangeStart") LocalDateTime rangeStart,
                                                @Param("rangeEnd") LocalDateTime rangeEnd,
                                                Pageable pageable);
+
     @Query("SELECT e FROM Event e WHERE " +
             "(:users IS NULL OR e.initiator.id IN :users) AND " +
             "(:states IS NULL OR e.state IN :states) AND " +
