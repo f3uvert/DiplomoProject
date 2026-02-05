@@ -6,3 +6,6 @@ CREATE TABLE IF NOT EXISTS hits (
     timestamp TIMESTAMP WITHOUT TIME ZONE NOT NULL,
     CONSTRAINT pk_hit PRIMARY KEY (id)
 );
+
+CREATE INDEX IF NOT EXISTS idx_hits_timestamp ON hits (timestamp);
+CREATE INDEX IF NOT EXISTS idx_hits_uri ON hits (uri);
