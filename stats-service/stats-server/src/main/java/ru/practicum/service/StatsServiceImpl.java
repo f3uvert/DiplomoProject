@@ -12,6 +12,8 @@ import ru.practicum.repository.StatsRepository;
 
 import java.time.LocalDateTime;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicLong;
 
 @Slf4j
 @Service
@@ -22,8 +24,8 @@ public class StatsServiceImpl implements StatsService {
     private final StatsRepository statsRepository;
     private final StatsMapper statsMapper;
 
-    private final Map<String, Integer> hitCounter = new HashMap<>();
-    private final Map<String, Set<String>> uniqueHits = new HashMap<>();
+    private final Map<String, AtomicLong> hitCounters = new ConcurrentHashMap<>();
+    private final Map<String, Set<String>> uniqueHits = new ConcurrentHashMap<>();
 
     @Override
     @Transactional
@@ -38,15 +40,17 @@ public class StatsServiceImpl implements StatsService {
             log.warn("Database save failed: {}", e.getMessage());
         }
 
-        String key = endpointHitDto.getUri();
+        String uri = endpointHitDto.getUri();
+        String ip = endpointHitDto.getIp();
 
-        hitCounter.put(key, hitCounter.getOrDefault(key, 0) + 1);
+        hitCounters.computeIfAbsent(uri, k -> new AtomicLong(0)).incrementAndGet();
 
-        uniqueHits.putIfAbsent(key, new HashSet<>());
-        uniqueHits.get(key).add(endpointHitDto.getIp());
+        uniqueHits.computeIfAbsent(uri, k -> ConcurrentHashMap.newKeySet()).add(ip);
 
-        log.info("Hit saved. Total for {}: {}, unique: {}",
-                key, hitCounter.get(key), uniqueHits.get(key).size());
+        long totalHits = hitCounters.get(uri).get();
+        long uniqueCount = uniqueHits.get(uri).size();
+
+        log.info("Hit saved for {}. Total: {}, Unique: {}", uri, totalHits, uniqueCount);
 
         return endpointHitDto;
     }
@@ -58,49 +62,38 @@ public class StatsServiceImpl implements StatsService {
 
         validateDates(start, end);
 
-        try {
-            List<ViewStatsDto> dbResult;
-            if (Boolean.TRUE.equals(unique)) {
-                dbResult = statsRepository.getUniqueStats(start, end, uris);
-            } else {
-                dbResult = statsRepository.getStats(start, end, uris);
-            }
-
-            if (!dbResult.isEmpty()) {
-                return dbResult;
-            }
-        } catch (Exception e) {
-            log.warn("Database query failed: {}", e.getMessage());
-        }
-
         List<ViewStatsDto> result = new ArrayList<>();
 
         if (uris == null || uris.isEmpty()) {
-            for (Map.Entry<String, Integer> entry : hitCounter.entrySet()) {
+            for (Map.Entry<String, AtomicLong> entry : hitCounters.entrySet()) {
                 String uri = entry.getKey();
-                long hits = Boolean.TRUE.equals(unique)
-                        ? uniqueHits.getOrDefault(uri, Collections.emptySet()).size()
-                        : entry.getValue();
+                long hits;
+
+                if (Boolean.TRUE.equals(unique)) {
+                    hits = uniqueHits.getOrDefault(uri, Collections.emptySet()).size();
+                } else {
+                    hits = entry.getValue().get();
+                }
 
                 result.add(new ViewStatsDto("ewm-main-service", uri, hits));
             }
         } else {
             for (String uri : uris) {
-                if (hitCounter.containsKey(uri)) {
-                    long hits = Boolean.TRUE.equals(unique)
-                            ? uniqueHits.getOrDefault(uri, Collections.emptySet()).size()
-                            : hitCounter.get(uri);
+                long hits;
 
-                    result.add(new ViewStatsDto("ewm-main-service", uri, hits));
+                if (Boolean.TRUE.equals(unique)) {
+                    hits = uniqueHits.getOrDefault(uri, Collections.emptySet()).size();
                 } else {
-                    result.add(new ViewStatsDto("ewm-main-service", uri, 0L));
+                    hits = hitCounters.getOrDefault(uri, new AtomicLong(0)).get();
                 }
+
+                result.add(new ViewStatsDto("ewm-main-service", uri, hits));
             }
         }
 
         result.sort((a, b) -> Long.compare(b.getHits(), a.getHits()));
 
-        log.info("Returning {} stats entries", result.size());
+        log.info("Returning {} stats entries: {}", result.size(), result);
         return result;
     }
 
