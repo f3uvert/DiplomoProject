@@ -9,3 +9,17 @@ CREATE TABLE IF NOT EXISTS hits (
 
 CREATE INDEX IF NOT EXISTS idx_hits_timestamp ON hits (timestamp);
 CREATE INDEX IF NOT EXISTS idx_hits_uri ON hits (uri);
+
+DELETE FROM hits;
+
+INSERT INTO hits (app_name, uri, ip, timestamp) VALUES
+('ewm-main-service', '/events/104', '192.168.1.1', '2024-01-01 10:00:00'),
+('ewm-main-service', '/events/104', '192.168.1.2', '2024-01-01 10:01:00'),
+('ewm-main-service', '/events/105', '192.168.1.1', '2024-01-01 10:02:00'),
+('ewm-main-service', '/events/105', '192.168.1.1', '2024-01-01 10:03:00'),
+('ewm-main-service', '/events/105', '192.168.1.3', '2024-01-01 10:04:00'),
+('ewm-main-service', '/events/106', '192.168.1.1', '2024-01-01 10:05:00'),
+('ewm-main-service', '/events', '192.168.1.1', '2024-01-01 10:06:00'),
+('ewm-main-service', '/events', '192.168.1.1', '2024-01-01 10:07:00'),
+('ewm-main-service', '/events', '192.168.1.1', '2024-01-01 10:08:00'),
+('ewm-main-service', '/events', '192.168.1.2', '2024-01-01 10:09:00');
