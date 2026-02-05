@@ -174,11 +174,27 @@ public class EventServiceImpl implements EventService {
                                                LocalDateTime rangeStart, LocalDateTime rangeEnd,
                                                Boolean onlyAvailable, String sort,
                                                int from, int size, HttpServletRequest request) {
+
+        log.info("Public events search: text={}, categories={}, paid={}, rangeStart={}, rangeEnd={}, onlyAvailable={}, sort={}",
+                text, categories, paid, rangeStart, rangeEnd, onlyAvailable, sort);
+
         statsClient.hit(
                 "ewm-main-service",
                 request.getRequestURI(),
                 request.getRemoteAddr()
         );
+
+        if (rangeStart == null) {
+            rangeStart = LocalDateTime.now();
+        }
+
+        if (rangeEnd == null) {
+            rangeEnd = LocalDateTime.now().plusYears(1);
+        }
+
+        if (onlyAvailable == null) {
+            onlyAvailable = false;
+        }
 
         Pageable pageable = buildPageable(sort, from, size);
 
