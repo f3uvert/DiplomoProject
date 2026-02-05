@@ -1,24 +1,24 @@
-# Используйте родительский образ для Java 17
-FROM eclipse-temurin:17-jdk-alpine
-
-# Установите Maven для сборки
-RUN apk add --no-cache maven
-
+# docker-build/main-service/Dockerfile
+FROM maven:3.8.4-eclipse-temurin-17 AS build
 WORKDIR /app
 
-# Копируем исходный код
-COPY pom.xml .
-COPY src ./src
+# Копируем весь проект (из корня, на уровень выше)
+COPY ../.. .
 
-# Собираем проект
-RUN mvn clean package -DskipTests
+# Собираем main-service и его зависимости
+RUN mvn clean package -pl main-service -am -DskipTests
 
-# Копируем собранный JAR
-RUN cp target/*.jar app.jar
+FROM eclipse-temurin:17-jre-alpine
+WORKDIR /app
+COPY --from=build /app/main-service/target/*.jar app.jar
 
-# Удаляем исходный код чтобы уменьшить размер образа
-RUN rm -rf src pom.xml target
+# Устанавливаем curl для healthcheck и postgresql-client для проверки БД
+RUN apk add --no-cache curl postgresql-client
 
 EXPOSE 8080
 
-ENTRYPOINT ["java", "-jar", "app.jar"]
+# Скрипт ожидания БД и запуска
+COPY wait-for-db.sh /wait-for-db.sh
+RUN chmod +x /wait-for-db.sh
+
+ENTRYPOINT ["/wait-for-db.sh", "ewm-db", "5432", "java", "-jar", "app.jar", "--server.address=0.0.0.0"]

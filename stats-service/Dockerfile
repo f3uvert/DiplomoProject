@@ -1,19 +1,19 @@
-# Используем eclipse-temurin вместо openjdk
-FROM eclipse-temurin:17-jre-alpine
+# stats-service/stats-server/Dockerfile
+FROM maven:3.8.4-eclipse-temurin-17 AS build
+WORKDIR /app
 
-# Или самый простой вариант - busybox
-# FROM busybox:latest
+# Копируем из корня проекта (на 3 уровня выше)
+COPY ../../.. .
+
+# Собираем stats-server
+RUN mvn clean package -pl stats-service/stats-server -am -DskipTests
+
+FROM eclipse-temurin:17-jre-alpine
+WORKDIR /app
+COPY --from=build /app/stats-service/stats-server/target/*.jar app.jar
 
 RUN apk add --no-cache curl
 
-WORKDIR /app
-
-# Создаем простой Java файл
-RUN echo 'public class App { public static void main(String[] args) throws Exception { System.out.println("Stats Server"); Thread.sleep(3600000); } }' > App.java && \
-    javac App.java 2>/dev/null || echo "Java compilation skipped" && \
-    # Создаем dummy файл если javac не работает
-    touch app.jar
-
 EXPOSE 9090
 
-CMD ["sh", "-c", "echo 'Stats Server starting...' && sleep 3600"]
+ENTRYPOINT ["java", "-jar", "app.jar", "--server.address=0.0.0.0"]
