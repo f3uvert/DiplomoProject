@@ -81,7 +81,3 @@ services:
       SPRING_DATASOURCE_USERNAME: admin
       SPRING_DATASOURCE_PASSWORD: password
       STATS_SERVER_URL: http://stats-server:9090
-
-networks:
-  ewm-network:
-    driver: bridge
