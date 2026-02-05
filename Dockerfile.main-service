@@ -1,29 +1,26 @@
-# Dockerfile.main-service
 FROM maven:3.8.4-eclipse-temurin-17 AS build
 WORKDIR /app
 
-# Копируем весь проект
-COPY . .
+# Копируем только нужное
+COPY pom.xml .
+COPY main-service/pom.xml main-service/pom.xml
+COPY main-service/src main-service/src
+COPY stats-service/stats-client/pom.xml stats-service/stats-client/pom.xml
+COPY stats-service/stats-client/src stats-service/stats-client/src
+COPY stats-service/stats-dto/pom.xml stats-service/stats-dto/pom.xml
+COPY stats-service/stats-dto/src stats-service/stats-dto/src
 
-# Собираем только main-service и его зависимости
-RUN mvn clean package -pl main-service -am -DskipTests
+# Сборка
+RUN mvn clean package -pl main-service -am -DskipTests -q
 
 FROM eclipse-temurin:17-jre-alpine
+WORKDIR /app
+COPY --from=build /app/main-service/target/*.jar app.jar
 
 # Устанавливаем curl для healthcheck
 RUN apk add --no-cache curl
 
-WORKDIR /app
-COPY --from=build /app/main-service/target/*.jar app.jar
-
-# Создаем не-root пользователя для безопасности
-RUN addgroup -S spring && adduser -S spring -G spring
-USER spring:spring
-
 EXPOSE 8080
 
-# Healthcheck
-HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
-  CMD curl -f http://localhost:8080/actuator/health || exit 1
-
-ENTRYPOINT ["java", "-jar", "app.jar"]
+# ОЧЕНЬ ВАЖНО: Указываем слушать все интерфейсы
+ENTRYPOINT ["java", "-jar", "app.jar", "--server.address=0.0.0.0"]
