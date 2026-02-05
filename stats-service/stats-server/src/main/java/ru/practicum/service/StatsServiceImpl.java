@@ -11,6 +11,7 @@ import ru.practicum.mapper.StatsMapper;
 import ru.practicum.repository.StatsRepository;
 
 import java.time.LocalDateTime;
+import java.util.Collections;
 import java.util.List;
 
 @Slf4j
@@ -50,6 +51,11 @@ public class StatsServiceImpl implements StatsService {
             result = statsRepository.getUniqueStats(start, end, uris);
         } else {
             result = statsRepository.getStats(start, end, uris);
+        }
+
+        // ВАЖНО: Всегда возвращаем список, даже если пустой
+        if (result == null) {
+            result = Collections.emptyList();
         }
 
         log.info("Result from DB: {}", result);
