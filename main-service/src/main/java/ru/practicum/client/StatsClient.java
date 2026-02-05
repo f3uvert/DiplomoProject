@@ -70,7 +70,10 @@ public class StatsClient {
     }
 
     public void hit(String app, String uri, String ip) {
-        executeSafely(() -> {
+        log.info("=== STATS CLIENT HIT ===");
+        log.info("Sending hit: app={}, uri={}, ip={}", app, uri, ip);
+
+        try {
             EndpointHitDto hitDto = EndpointHitDto.builder()
                     .app(app)
                     .uri(uri)
@@ -78,10 +81,18 @@ public class StatsClient {
                     .timestamp(LocalDateTime.now())
                     .build();
 
-            log.info("Sending hit: app={}, uri={}, ip={}", app, uri, ip);
-            hit(hitDto);
-            return null;
-        }, "hitString");
+            log.info("DTO: {}", hitDto);
+            ResponseEntity<Void> response = rest.postForEntity(
+                    serverUrl + "/hit",
+                    hitDto,
+                    Void.class
+            );
+
+            log.info("Response status: {}", response.getStatusCode());
+
+        } catch (Exception e) {
+            log.error("Failed to send hit: {}", e.getMessage(), e);
+        }
     }
 
     private <T> T executeSafely(SupplierWithException<T> supplier, String operation) {
