@@ -163,35 +163,56 @@ public class EventServiceImpl implements EventService {
         return eventMapper.toFullDto(updatedEvent);
     }
 
-    @Override
     public EventFullDto getPublicEvent(Long eventId, HttpServletRequest request) {
+        log.info("=== GET PUBLIC EVENT {} ===", eventId);
+        log.info("StatsClient is null? {}", statsClient == null); // ← Проверка
+
         Event event = eventRepository.findByIdAndState(eventId, Event.EventState.PUBLISHED)
                 .orElseThrow(() -> new NotFoundException("Event not found"));
 
         String ip = request.getRemoteAddr();
         String uri = request.getRequestURI();
 
-        log.info("Public GET request for event {} from IP: {}", eventId, ip);
+        log.info("Will send hit: app=ewm-main-service, uri={}, ip={}", uri, ip);
 
-        Long views = viewService.incrementAndGetViews(eventId, ip);
-
-        log.info("Event {} now has {} views (local cache)", eventId, views);
-
+        // ОТПРАВКА HIT
         try {
-            statsClient.hit(
-                    "ewm-main-service",
-                    uri,
-                    ip
-            );
-            log.info("Hit sent to stats service for event {}", eventId);
+            statsClient.hit("ewm-main-service", uri, ip);
+            log.info("Hit sent via StatsClient");
         } catch (Exception e) {
-            log.warn("Failed to send stats hit: {}", e.getMessage());
+            log.error("Failed to send hit: {}", e.getMessage(), e);
         }
 
-        // Устанавливаем views в событие
-        event.setViews(views);
+        viewService.incrementAndGetViews(eventId, ip);
+
+        Long realViews = getViewsFromStatsService(eventId);
+        log.info("Real views from stats-service for event {}: {}", eventId, realViews);
+
+        event.setViews(realViews);
 
         return eventMapper.toFullDto(event);
+    }
+
+    private Long getViewsFromStatsService(Long eventId) {
+        try {
+            LocalDateTime start = LocalDateTime.now().minusYears(1);
+            LocalDateTime end = LocalDateTime.now();
+            String uri = "/events/" + eventId;
+
+            List<ViewStatsDto> stats = statsClient.getStats(
+                    start, end, Collections.singletonList(uri), true
+            );
+
+            if (!stats.isEmpty()) {
+                Long views = stats.get(0).getHits();
+                log.debug("Stats service returned {} views for event {}", views, eventId);
+                return views;
+            }
+        } catch (Exception e) {
+            log.warn("Could not get views from stats service: {}", e.getMessage());
+        }
+
+        return viewService.getViews(eventId);
     }
 
     @Override
@@ -200,11 +221,16 @@ public class EventServiceImpl implements EventService {
                                                Boolean onlyAvailable, String sort,
                                                int from, int size, HttpServletRequest request) {
 
+        log.info("=== GET PUBLIC EVENTS ===");
+        log.info("Params: text={}, categories={}, paid={}, rangeStart={}, rangeEnd={}, onlyAvailable={}, sort={}, from={}, size={}",
+                text, categories, paid, rangeStart, rangeEnd, onlyAvailable, sort, from, size);
+
         if (rangeStart != null && rangeEnd != null && rangeEnd.isBefore(rangeStart)) {
             throw new ValidationException("RangeEnd cannot be before rangeStart");
         }
 
         try {
+            log.info("Sending hit for /events search");
             statsClient.hit(
                     "ewm-main-service",
                     request.getRequestURI(),
@@ -224,23 +250,27 @@ public class EventServiceImpl implements EventService {
         Pageable pageable = buildPageable(sort, from, size);
 
         List<Event> filteredEvents = getFilteredEvents(finalText, finalCategories, finalPaid, pageable);
+        log.info("Found {} events after initial filtering", filteredEvents.size());
 
         List<Event> eventsAfterDateFilter = filteredEvents.stream()
                 .filter(event -> !event.getEventDate().isBefore(finalRangeStart))
                 .filter(event -> !event.getEventDate().isAfter(finalRangeEnd))
                 .collect(Collectors.toList());
+        log.info("{} events after date filter", eventsAfterDateFilter.size());
 
         List<Event> eventsAfterAvailabilityFilter = eventsAfterDateFilter.stream()
                 .filter(event -> !finalOnlyAvailable ||
                         event.getParticipantLimit() == 0 ||
                         event.getConfirmedRequests() < event.getParticipantLimit())
                 .collect(Collectors.toList());
+        log.info("{} events after availability filter", eventsAfterAvailabilityFilter.size());
 
         List<Event> eventsAfterCategoryFilter = eventsAfterAvailabilityFilter;
         if (!finalCategories.isEmpty() && finalText.isEmpty()) {
             eventsAfterCategoryFilter = eventsAfterAvailabilityFilter.stream()
                     .filter(event -> finalCategories.contains(event.getCategory().getId()))
                     .collect(Collectors.toList());
+            log.info("{} events after category filter", eventsAfterCategoryFilter.size());
         }
 
         List<Event> finalEventsList = eventsAfterCategoryFilter;
@@ -248,79 +278,97 @@ public class EventServiceImpl implements EventService {
             finalEventsList = eventsAfterCategoryFilter.stream()
                     .filter(event -> event.getPaid().equals(finalPaid))
                     .collect(Collectors.toList());
+            log.info("{} events after paid filter", finalEventsList.size());
         }
 
-        Map<Long, Long> viewsMap;
-        try {
-            viewsMap = getEventsViews(
-                    finalEventsList.stream().map(Event::getId).collect(Collectors.toList())
-            );
-        } catch (Exception e) {
-            log.warn("Failed to get views: {}", e.getMessage());
-            viewsMap = new HashMap<>();
-        }
+        Map<Long, Long> viewsMap = getEventsViewsFromStatsService(
+                finalEventsList.stream().map(Event::getId).collect(Collectors.toList())
+        );
+        log.info("Views map from stats-service: {}", viewsMap);
 
-        final List<Event> eventsForMapping = finalEventsList;
-        final Map<Long, Long> finalViewsMap = viewsMap;
-
-        return eventsForMapping.stream()
+        return finalEventsList.stream()
                 .map(event -> {
-                    Event eventWithViews = Event.builder()
-                            .id(event.getId())
-                            .annotation(event.getAnnotation())
-                            .category(event.getCategory())
-                            .confirmedRequests(event.getConfirmedRequests())
-                            .createdOn(event.getCreatedOn())
-                            .description(event.getDescription())
-                            .eventDate(event.getEventDate())
-                            .initiator(event.getInitiator())
-                            .location(event.getLocation())
-                            .paid(event.getPaid())
-                            .participantLimit(event.getParticipantLimit())
-                            .publishedOn(event.getPublishedOn())
-                            .requestModeration(event.getRequestModeration())
-                            .state(event.getState())
-                            .title(event.getTitle())
-                            .views(finalViewsMap.getOrDefault(event.getId(), 0L))
-                            .build();
-                    return eventMapper.toShortDto(eventWithViews);
+                    Long realViews = viewsMap.getOrDefault(event.getId(), 0L);
+
+                    event.setViews(realViews);
+
+                    return eventMapper.toShortDto(event);
                 })
                 .collect(Collectors.toList());
     }
 
+    private Map<Long, Long> getEventsViewsFromStatsService(List<Long> eventIds) {
+        if (eventIds.isEmpty()) {
+            log.info("No event IDs to get views for");
+            return Collections.emptyMap();
+        }
+
+        log.info("Getting views from stats-service for {} events: {}", eventIds.size(), eventIds);
+
+        Map<Long, Long> viewsMap = new HashMap<>();
+
+        try {
+            LocalDateTime start = LocalDateTime.now().minusYears(1);
+            LocalDateTime end = LocalDateTime.now();
+
+            List<String> uris = eventIds.stream()
+                    .map(id -> "/events/" + id)
+                    .collect(Collectors.toList());
+
+            log.info("Requesting stats for URIs: {}", uris);
+
+            List<ViewStatsDto> stats = statsClient.getStats(
+                    start, end, uris, true
+            );
+
+            log.info("Received {} stats results from stats-service", stats.size());
+
+            for (ViewStatsDto stat : stats) {
+                try {
+                    String uri = stat.getUri();
+                    if (uri.startsWith("/events/")) {
+                        Long eventId = Long.parseLong(uri.substring("/events/".length()));
+                        viewsMap.put(eventId, stat.getHits());
+                        log.debug("Event {} has {} views", eventId, stat.getHits());
+                    }
+                } catch (Exception e) {
+                    log.warn("Failed to parse event id from uri: {}", stat.getUri());
+                }
+            }
+
+        } catch (Exception e) {
+            log.warn("Failed to get views from stats service: {}", e.getMessage());
+            for (Long eventId : eventIds) {
+                viewsMap.put(eventId, viewService.getViews(eventId));
+            }
+        }
+
+        return viewsMap;
+    }
+
     private List<Event> getFilteredEvents(String text, List<Long> categories, Boolean paid, Pageable pageable) {
         if (!text.isEmpty()) {
+            log.info("Searching events by text: {}", text);
             return eventRepository.findPublishedEventsByText(text, pageable);
         } else if (!categories.isEmpty()) {
+            log.info("Searching events by categories: {}", categories);
             return eventRepository.findPublishedEventsByCategories(categories, pageable);
         } else if (paid != null) {
+            log.info("Searching events by paid: {}", paid);
             return eventRepository.findPublishedEventsByPaid(paid, pageable);
         } else {
+            log.info("Getting all published events");
             return eventRepository.findPublishedEvents(pageable);
         }
     }
 
     private Long getEventViews(Long eventId) {
-        try {
-            LocalDateTime start = LocalDateTime.now().minusYears(1);
-            LocalDateTime end = LocalDateTime.now();
-            String uri = "/events/" + eventId;
+        log.info("Getting views for event {}...", eventId);
 
-            List<ViewStatsDto> stats = statsClient.getStats(
-                    start, end, Collections.singletonList(uri), true
-            );
-
-            if (!stats.isEmpty()) {
-                log.debug("Stats service returned {} views for event {}",
-                        stats.get(0).getHits(), eventId);
-                return stats.get(0).getHits();
-            }
-        } catch (Exception e) {
-            log.warn("Could not get views from stats service: {}", e.getMessage());
-        }
 
         Long localViews = viewService.getViews(eventId);
-        log.debug("Using local cache: {} views for event {}", localViews, eventId);
+        log.info("Using local view service: {} views for event {}", localViews, eventId);
+
         return localViews;
     }
 
@@ -351,10 +399,12 @@ public class EventServiceImpl implements EventService {
     }
 
     private Pageable buildPageable(String sort, int from, int size) {
-        if ("EVENT_DATE".equals(sort)) {
+        log.info("Building pageable: sort={}, from={}, size={}", sort, from, size);
+
+        if ("EVENT_DATE".equalsIgnoreCase(sort)) {
             return PageRequest.of(from / size, size, Sort.by("eventDate").ascending());
-        } else if ("VIEWS".equals(sort)) {
-            return PageRequest.of(from / size, size, Sort.by("views").descending());
+        } else if ("VIEWS".equalsIgnoreCase(sort)) {
+            return PageRequest.of(from / size, size);
         } else {
             return PageRequest.of(from / size, size);
         }
