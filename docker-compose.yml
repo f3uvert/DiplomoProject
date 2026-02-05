@@ -34,37 +34,30 @@ services:
 
   stats-server:
     build:
-      context: .
-      dockerfile: docker/stats-server/Dockerfile
+      context: ./stats-server
+      dockerfile: Dockerfile
     container_name: stats-server
     ports:
-      - "9090:9090"  # Spring Boot порт
-    # НЕ зависит от базы!
-    environment:
-      # Принудительно указываем порт
-      SERVER_PORT: 9090
-      SERVER_ADDRESS: 0.0.0.0
-    # Простой healthcheck
+      - "9090:9090"
+    networks:
+      - ewm-network
     healthcheck:
-      test: [ "CMD-SHELL", "curl -f http://127.0.0.1:9090/actuator/health || exit 1" ]
-      interval: 10s
-      timeout: 5s
+      test: [ "CMD", "curl", "-f", "http://localhost:9090/actuator/health" ]
+      interval: 30s
+      timeout: 10s
       retries: 3
 
   ewm-service:
     build:
-      context: .  # корень проекта
-      dockerfile: docker/main-service/Dockerfile
-    container_name: ewm-main-service
+      context: ./main-service
+      dockerfile: Dockerfile
+    container_name: ewm-service
     ports:
       - "8080:8080"
-    depends_on:
-      ewm-db:
-        condition: service_healthy
-      stats-server:
-        condition: service_started
     environment:
-      SPRING_DATASOURCE_URL: jdbc:postgresql://ewm-db:5432/ewm_main_db
-      SPRING_DATASOURCE_USERNAME: admin
-      SPRING_DATASOURCE_PASSWORD: password
-      STATS_SERVER_URL: http://stats-server:9090
+      - STATS_SERVER_URL=http://stats-server:9090
+    depends_on:
+      stats-server:
+        condition: service_healthy
+    networks:
+      - ewm-network
