@@ -11,9 +11,7 @@ import ru.practicum.mapper.StatsMapper;
 import ru.practicum.repository.StatsRepository;
 
 import java.time.LocalDateTime;
-import java.util.*;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.atomic.AtomicLong;
+import java.util.List;
 
 @Slf4j
 @Service
@@ -24,9 +22,6 @@ public class StatsServiceImpl implements StatsService {
     private final StatsRepository statsRepository;
     private final StatsMapper statsMapper;
 
-    private static final Map<String, AtomicLong> HIT_COUNTERS = new ConcurrentHashMap<>();
-    private static final Map<String, Set<String>> UNIQUE_HITS = new ConcurrentHashMap<>();
-
     @Override
     @Transactional
     public EndpointHitDto saveHit(EndpointHitDto endpointHitDto) {
@@ -34,30 +29,9 @@ public class StatsServiceImpl implements StatsService {
         log.info("URI: {}, IP: {}, App: {}",
                 endpointHitDto.getUri(), endpointHitDto.getIp(), endpointHitDto.getApp());
 
-        try {
-            EndpointHit hit = statsMapper.toEntity(endpointHitDto);
-            statsRepository.save(hit);
-            log.info("Saved to database: ID={}", hit.getId());
-        } catch (Exception e) {
-            log.warn("Database save failed: {}", e.getMessage());
-        }
-
-        String uri = endpointHitDto.getUri();
-        String ip = endpointHitDto.getIp();
-
-        HIT_COUNTERS.computeIfAbsent(uri, k -> {
-            log.info("Creating new counter for URI: {}", uri);
-            return new AtomicLong(0);
-        }).incrementAndGet();
-
-        UNIQUE_HITS.computeIfAbsent(uri, k -> ConcurrentHashMap.newKeySet()).add(ip);
-
-        long totalHits = HIT_COUNTERS.get(uri).get();
-        long uniqueCount = UNIQUE_HITS.get(uri).size();
-
-        log.info("After save - URI: {}, Total: {}, Unique: {}", uri, totalHits, uniqueCount);
-
-        log.info("All counters: {}", HIT_COUNTERS);
+        EndpointHit hit = statsMapper.toEntity(endpointHitDto);
+        statsRepository.save(hit);
+        log.info("Saved to database: ID={}", hit.getId());
 
         return endpointHitDto;
     }
@@ -66,41 +40,22 @@ public class StatsServiceImpl implements StatsService {
     public List<ViewStatsDto> getStats(LocalDateTime start, LocalDateTime end,
                                        List<String> uris, Boolean unique) {
         log.info("=== GET STATS ===");
-        log.info("Params: uris={}, unique={}", uris, unique);
-        log.info("Current counters: {}", HIT_COUNTERS);
+        log.info("Params: start={}, end={}, uris={}, unique={}", start, end, uris, unique);
 
         validateDates(start, end);
 
-        List<ViewStatsDto> result = new ArrayList<>();
+        List<ViewStatsDto> result;
 
-        if (uris == null || uris.isEmpty()) {
-            for (Map.Entry<String, AtomicLong> entry : HIT_COUNTERS.entrySet()) {
-                String uri = entry.getKey();
-                long hits = getHitsForUri(uri, unique);
-                result.add(new ViewStatsDto("ewm-main-service", uri, hits));
-                log.info("Adding: URI={}, Hits={}", uri, hits);
-            }
-        } else {
-            for (String uri : uris) {
-                long hits = getHitsForUri(uri, unique);
-                result.add(new ViewStatsDto("ewm-main-service", uri, hits));
-                log.info("Adding requested: URI={}, Hits={}", uri, hits);
-            }
-        }
-
-        result.sort((a, b) -> Long.compare(b.getHits(), a.getHits()));
-        log.info("Sorted result: {}", result);
-
-        return result;
-    }
-
-    private long getHitsForUri(String uri, Boolean unique) {
+        // ВАЖНО: uris может быть null, и это нормально
+        // Репозиторий обрабатывает это с помощью (:uris IS NULL OR h.uri IN :uris)
         if (Boolean.TRUE.equals(unique)) {
-            return UNIQUE_HITS.getOrDefault(uri, Collections.emptySet()).size();
+            result = statsRepository.getUniqueStats(start, end, uris);
         } else {
-            AtomicLong counter = HIT_COUNTERS.get(uri);
-            return counter != null ? counter.get() : 0L;
+            result = statsRepository.getStats(start, end, uris);
         }
+
+        log.info("Result from DB: {}", result);
+        return result;
     }
 
     private void validateDates(LocalDateTime start, LocalDateTime end) {
