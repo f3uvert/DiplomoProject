@@ -16,6 +16,19 @@ services:
       retries: 5
       start_period: 10s
 
+  ewm-service:
+        container_name: ewm-service
+        image: ewm-service:latest
+        ports:
+          - "8080:8080"
+        environment:
+          - SPRING_PROFILES_ACTIVE=docker
+        depends_on:
+          stats-server:
+            condition: service_healthy
+        networks:
+          - ewm-network
+
   stats-db:
     image: postgres:14-alpine
     container_name: stats-db
@@ -68,3 +81,7 @@ services:
       SPRING_DATASOURCE_USERNAME: admin
       SPRING_DATASOURCE_PASSWORD: password
       STATS_SERVER_URL: http://stats-server:9090
+
+networks:
+  ewm-network:
+    driver: bridge

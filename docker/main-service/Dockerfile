@@ -1,3 +1,4 @@
+
 # docker/main-service/Dockerfile
 FROM maven:3.8.4-eclipse-temurin-17 AS build
 WORKDIR /app
