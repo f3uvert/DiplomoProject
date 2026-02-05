@@ -24,6 +24,7 @@ import ru.practicum.repository.UserRepository;
 import jakarta.servlet.http.HttpServletRequest;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -183,52 +184,101 @@ public class EventServiceImpl implements EventService {
                                                Boolean onlyAvailable, String sort,
                                                int from, int size, HttpServletRequest request) {
 
-        log.info("Public events search: text={}, categories={}, paid={}, rangeStart={}, rangeEnd={}, onlyAvailable={}, sort={}",
-                text, categories, paid, rangeStart, rangeEnd, onlyAvailable, sort);
-
-        statsClient.hit(
-                "ewm-main-service",
-                request.getRequestURI(),
-                request.getRemoteAddr()
-        );
-
-        if (rangeStart == null) {
-            rangeStart = LocalDateTime.now();
+        try {
+            statsClient.hit(
+                    "ewm-main-service",
+                    request.getRequestURI(),
+                    request.getRemoteAddr()
+            );
+        } catch (Exception e) {
+            log.warn("Failed to send stats hit: {}", e.getMessage());
         }
 
-        if (rangeEnd == null) {
-            rangeEnd = LocalDateTime.now().plusYears(1);
-        }
-
-        if (onlyAvailable == null) {
-            onlyAvailable = false;
-        }
+        final LocalDateTime finalRangeStart = (rangeStart != null) ? rangeStart : LocalDateTime.now();
+        final LocalDateTime finalRangeEnd = (rangeEnd != null) ? rangeEnd : LocalDateTime.now().plusYears(1);
+        final Boolean finalOnlyAvailable = (onlyAvailable != null) ? onlyAvailable : false;
+        final String finalText = (text != null) ? text.trim() : "";
+        final List<Long> finalCategories = (categories != null) ? categories : Collections.emptyList();
+        final Boolean finalPaid = paid;
 
         Pageable pageable = buildPageable(sort, from, size);
 
-        List<Event> events = eventRepository.findPublicEvents(
-                text, categories, paid, rangeStart, rangeEnd, onlyAvailable, pageable
-        );
+        List<Event> filteredEvents = getFilteredEvents(finalText, finalCategories, finalPaid, pageable);
 
-        Map<Long, Long> viewsMap = getEventsViews(
-                events.stream().map(Event::getId).collect(Collectors.toList())
-        );
+        List<Event> eventsAfterDateFilter = filteredEvents.stream()
+                .filter(event -> !event.getEventDate().isBefore(finalRangeStart))
+                .filter(event -> !event.getEventDate().isAfter(finalRangeEnd))
+                .collect(Collectors.toList());
 
-        if (Boolean.TRUE.equals(onlyAvailable)) {
-            events = events.stream()
-                    .filter(event -> event.getParticipantLimit() == 0 ||
-                            event.getConfirmedRequests() < event.getParticipantLimit())
+        List<Event> eventsAfterAvailabilityFilter = eventsAfterDateFilter.stream()
+                .filter(event -> !finalOnlyAvailable ||
+                        event.getParticipantLimit() == 0 ||
+                        event.getConfirmedRequests() < event.getParticipantLimit())
+                .collect(Collectors.toList());
+
+        List<Event> eventsAfterCategoryFilter = eventsAfterAvailabilityFilter;
+        if (!finalCategories.isEmpty() && finalText.isEmpty()) {
+            eventsAfterCategoryFilter = eventsAfterAvailabilityFilter.stream()
+                    .filter(event -> finalCategories.contains(event.getCategory().getId()))
                     .collect(Collectors.toList());
         }
 
-        return events.stream()
+        List<Event> finalEventsList = eventsAfterCategoryFilter;
+        if (finalPaid != null && finalText.isEmpty() && finalCategories.isEmpty()) {
+            finalEventsList = eventsAfterCategoryFilter.stream()
+                    .filter(event -> event.getPaid().equals(finalPaid))
+                    .collect(Collectors.toList());
+        }
+
+        Map<Long, Long> viewsMap;
+        try {
+            viewsMap = getEventsViews(
+                    finalEventsList.stream().map(Event::getId).collect(Collectors.toList())
+            );
+        } catch (Exception e) {
+            log.warn("Failed to get views: {}", e.getMessage());
+            viewsMap = new HashMap<>();
+        }
+
+        final List<Event> eventsForMapping = finalEventsList;
+        final Map<Long, Long> finalViewsMap = viewsMap;
+
+        return eventsForMapping.stream()
                 .map(event -> {
-                    event.setViews(viewsMap.getOrDefault(event.getId(), 0L));
-                    return eventMapper.toShortDto(event);
+                    Event eventWithViews = Event.builder()
+                            .id(event.getId())
+                            .annotation(event.getAnnotation())
+                            .category(event.getCategory())
+                            .confirmedRequests(event.getConfirmedRequests())
+                            .createdOn(event.getCreatedOn())
+                            .description(event.getDescription())
+                            .eventDate(event.getEventDate())
+                            .initiator(event.getInitiator())
+                            .location(event.getLocation())
+                            .paid(event.getPaid())
+                            .participantLimit(event.getParticipantLimit())
+                            .publishedOn(event.getPublishedOn())
+                            .requestModeration(event.getRequestModeration())
+                            .state(event.getState())
+                            .title(event.getTitle())
+                            .views(finalViewsMap.getOrDefault(event.getId(), 0L))
+                            .build();
+                    return eventMapper.toShortDto(eventWithViews);
                 })
                 .collect(Collectors.toList());
     }
 
+    private List<Event> getFilteredEvents(String text, List<Long> categories, Boolean paid, Pageable pageable) {
+        if (!text.isEmpty()) {
+            return eventRepository.findPublishedEventsByText(text, pageable);
+        } else if (!categories.isEmpty()) {
+            return eventRepository.findPublishedEventsByCategories(categories, pageable);
+        } else if (paid != null) {
+            return eventRepository.findPublishedEventsByPaid(paid, pageable);
+        } else {
+            return eventRepository.findPublishedEvents(pageable);
+        }
+    }
 
     private Long getEventViews(Long eventId) {
         LocalDateTime start = LocalDateTime.now().minusYears(1);
