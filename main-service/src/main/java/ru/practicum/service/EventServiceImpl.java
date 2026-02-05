@@ -118,7 +118,7 @@ public class EventServiceImpl implements EventService {
         Pageable pageable = PageRequest.of(from / size, size);
 
         List<Event> events = eventRepository.findAdminEvents(
-                users, stateStrings, categories, rangeStart, rangeEnd, pageable  // ← передаем строки
+                users, states, categories, rangeStart, rangeEnd, pageable
         );
 
         return events.stream()
