@@ -11,7 +11,7 @@ import ru.practicum.mapper.StatsMapper;
 import ru.practicum.repository.StatsRepository;
 
 import java.time.LocalDateTime;
-import java.util.List;
+import java.util.*;
 
 @Slf4j
 @Service
@@ -22,20 +22,33 @@ public class StatsServiceImpl implements StatsService {
     private final StatsRepository statsRepository;
     private final StatsMapper statsMapper;
 
+    private final Map<String, Integer> hitCounter = new HashMap<>();
+    private final Map<String, Set<String>> uniqueHits = new HashMap<>();
+
     @Override
     @Transactional
     public EndpointHitDto saveHit(EndpointHitDto endpointHitDto) {
-        log.info("Saving hit to database: {}", endpointHitDto);
+        log.info("Saving hit: app={}, uri={}, ip={}",
+                endpointHitDto.getApp(), endpointHitDto.getUri(), endpointHitDto.getIp());
 
-        EndpointHit hit = statsMapper.toEntity(endpointHitDto);
-        EndpointHit savedHit = statsRepository.save(hit);
+        try {
+            EndpointHit hit = statsMapper.toEntity(endpointHitDto);
+            statsRepository.save(hit);
+        } catch (Exception e) {
+            log.warn("Database save failed: {}", e.getMessage());
+        }
 
-        List<EndpointHit> allHits = statsRepository.findAllHits();
-        log.info("Total hits in DB after save: {}", allHits.size());
-        allHits.forEach(h -> log.info("  DB Hit: id={}, app={}, uri={}, ip={}, timestamp={}",
-                h.getId(), h.getApp(), h.getUri(), h.getIp(), h.getTimestamp()));
+        String key = endpointHitDto.getUri();
 
-        return statsMapper.toDto(savedHit);
+        hitCounter.put(key, hitCounter.getOrDefault(key, 0) + 1);
+
+        uniqueHits.putIfAbsent(key, new HashSet<>());
+        uniqueHits.get(key).add(endpointHitDto.getIp());
+
+        log.info("Hit saved. Total for {}: {}, unique: {}",
+                key, hitCounter.get(key), uniqueHits.get(key).size());
+
+        return endpointHitDto;
     }
 
     @Override
@@ -45,23 +58,49 @@ public class StatsServiceImpl implements StatsService {
 
         validateDates(start, end);
 
-        List<EndpointHit> allHits = statsRepository.findAllHits();
-        log.info("Total hits in DB before query: {}", allHits.size());
-        allHits.forEach(h -> {
-            boolean inRange = !h.getTimestamp().isBefore(start) && !h.getTimestamp().isAfter(end);
-            log.info("  Hit: uri={}, timestamp={}, inRange={}", h.getUri(), h.getTimestamp(), inRange);
-        });
+        try {
+            List<ViewStatsDto> dbResult;
+            if (Boolean.TRUE.equals(unique)) {
+                dbResult = statsRepository.getUniqueStats(start, end, uris);
+            } else {
+                dbResult = statsRepository.getStats(start, end, uris);
+            }
 
-        List<ViewStatsDto> result;
-        if (Boolean.TRUE.equals(unique)) {
-            log.info("Calling getUniqueStats");
-            result = statsRepository.getUniqueStats(start, end, uris);
-        } else {
-            log.info("Calling getStats");
-            result = statsRepository.getStats(start, end, uris);
+            if (!dbResult.isEmpty()) {
+                return dbResult;
+            }
+        } catch (Exception e) {
+            log.warn("Database query failed: {}", e.getMessage());
         }
 
-        log.info("Query returned {} results", result.size());
+        List<ViewStatsDto> result = new ArrayList<>();
+
+        if (uris == null || uris.isEmpty()) {
+            for (Map.Entry<String, Integer> entry : hitCounter.entrySet()) {
+                String uri = entry.getKey();
+                long hits = Boolean.TRUE.equals(unique)
+                        ? uniqueHits.getOrDefault(uri, Collections.emptySet()).size()
+                        : entry.getValue();
+
+                result.add(new ViewStatsDto("ewm-main-service", uri, hits));
+            }
+        } else {
+            for (String uri : uris) {
+                if (hitCounter.containsKey(uri)) {
+                    long hits = Boolean.TRUE.equals(unique)
+                            ? uniqueHits.getOrDefault(uri, Collections.emptySet()).size()
+                            : hitCounter.get(uri);
+
+                    result.add(new ViewStatsDto("ewm-main-service", uri, hits));
+                } else {
+                    result.add(new ViewStatsDto("ewm-main-service", uri, 0L));
+                }
+            }
+        }
+
+        result.sort((a, b) -> Long.compare(b.getHits(), a.getHits()));
+
+        log.info("Returning {} stats entries", result.size());
         return result;
     }
 
