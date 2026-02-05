@@ -83,4 +83,5 @@ public class StatsController {
             throw new IllegalArgumentException("End date must be after start date");
         }
     }
+
 }

@@ -25,13 +25,15 @@ public class StatsServiceImpl implements StatsService {
     @Override
     @Transactional
     public EndpointHitDto saveHit(EndpointHitDto endpointHitDto) {
-        log.info("Saving hit: app={}, uri={}, ip={}",
-                endpointHitDto.getApp(), endpointHitDto.getUri(), endpointHitDto.getIp());
+        log.info("Saving hit to database: {}", endpointHitDto);
 
         EndpointHit hit = statsMapper.toEntity(endpointHitDto);
-
         EndpointHit savedHit = statsRepository.save(hit);
-        log.info("Hit saved with ID: {}", savedHit.getId());
+
+        List<EndpointHit> allHits = statsRepository.findAllHits();
+        log.info("Total hits in DB after save: {}", allHits.size());
+        allHits.forEach(h -> log.info("  DB Hit: id={}, app={}, uri={}, ip={}, timestamp={}",
+                h.getId(), h.getApp(), h.getUri(), h.getIp(), h.getTimestamp()));
 
         return statsMapper.toDto(savedHit);
     }
@@ -43,25 +45,32 @@ public class StatsServiceImpl implements StatsService {
 
         validateDates(start, end);
 
-        List<String> urisList = (uris == null || uris.isEmpty()) ? null : uris;
+        List<EndpointHit> allHits = statsRepository.findAllHits();
+        log.info("Total hits in DB before query: {}", allHits.size());
+        allHits.forEach(h -> {
+            boolean inRange = !h.getTimestamp().isBefore(start) && !h.getTimestamp().isAfter(end);
+            log.info("  Hit: uri={}, timestamp={}, inRange={}", h.getUri(), h.getTimestamp(), inRange);
+        });
 
+        List<ViewStatsDto> result;
         if (Boolean.TRUE.equals(unique)) {
-            return statsRepository.getUniqueStats(start, end, urisList);
+            log.info("Calling getUniqueStats");
+            result = statsRepository.getUniqueStats(start, end, uris);
         } else {
-            return statsRepository.getStats(start, end, urisList);
+            log.info("Calling getStats");
+            result = statsRepository.getStats(start, end, uris);
         }
+
+        log.info("Query returned {} results", result.size());
+        return result;
     }
 
     private void validateDates(LocalDateTime start, LocalDateTime end) {
         if (start == null || end == null) {
             throw new IllegalArgumentException("Start and end dates are required");
         }
-
         if (end.isBefore(start)) {
             throw new IllegalArgumentException("End date must be after start date");
         }
-
-
-
     }
 }
