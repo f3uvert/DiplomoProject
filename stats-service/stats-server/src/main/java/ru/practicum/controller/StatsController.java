@@ -33,16 +33,23 @@ public class StatsController {
 
     @GetMapping("/stats")
     public List<ViewStatsDto> getStats(
-            @RequestParam String start,
-            @RequestParam String end,
+            @RequestParam(required = false) String start,
+            @RequestParam(required = false) String end,
             @RequestParam(required = false) List<String> uris,
             @RequestParam(required = false, defaultValue = "false") Boolean unique) {
 
-        log.info("Raw params received - start: '{}', end: '{}'", start, end);
+        log.info("GET /stats called with start={}, end={}, uris={}, unique={}", start, end, uris, unique);
+
+        if (start == null || start.isEmpty()) {
+            throw new IllegalArgumentException("Parameter 'start' is required");
+        }
+        if (end == null || end.isEmpty()) {
+            throw new IllegalArgumentException("Parameter 'end' is required");
+        }
 
         try {
-            start = URLDecoder.decode(start, StandardCharsets.UTF_8.toString());
-            end = URLDecoder.decode(end, StandardCharsets.UTF_8.toString());
+            start = URLDecoder.decode(start, StandardCharsets.UTF_8);
+            end = URLDecoder.decode(end, StandardCharsets.UTF_8);
 
             log.info("Decoded params - start: '{}', end: '{}'", start, end);
 
@@ -51,16 +58,20 @@ public class StatsController {
 
             validateDates(startDate, endDate);
 
-            return statsService.getStats(startDate, endDate, uris, unique);
+            List<ViewStatsDto> result = statsService.getStats(startDate, endDate, uris, unique);
+            log.info("Returning stats result: {}", result);
+
+            return result;
 
         } catch (DateTimeParseException e) {
             throw new IllegalArgumentException(
-                    String.format("Invalid date format. Expected: yyyy-MM-dd HH:mm:ss. Received: start='%s', end='%s'. Error: %s",
-                            start, end, e.getMessage()),
+                    String.format("Invalid date format. Expected: yyyy-MM-dd HH:mm:ss. Received: start='%s', end='%s'",
+                            start, end),
                     e
             );
         } catch (Exception e) {
-            throw new IllegalArgumentException("Error processing request: " + e.getMessage(), e);
+            log.error("Error processing /stats request", e);
+            throw e;
         }
     }
 
