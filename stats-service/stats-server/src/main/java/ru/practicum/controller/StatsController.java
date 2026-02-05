@@ -33,34 +33,31 @@ public class StatsController {
 
     @GetMapping("/stats")
     public List<ViewStatsDto> getStats(
-            @RequestParam(required = false) String start,
-            @RequestParam(required = false) String end,
+            @RequestParam String start,
+            @RequestParam String end,
             @RequestParam(required = false) List<String> uris,
             @RequestParam(required = false, defaultValue = "false") Boolean unique) {
 
         log.info("GET /stats called with start={}, end={}, uris={}, unique={}", start, end, uris, unique);
 
-        if (start == null || start.isEmpty()) {
-            throw new IllegalArgumentException("Parameter 'start' is required");
-        }
-        if (end == null || end.isEmpty()) {
-            throw new IllegalArgumentException("Parameter 'end' is required");
-        }
-
         try {
             start = URLDecoder.decode(start, StandardCharsets.UTF_8);
             end = URLDecoder.decode(end, StandardCharsets.UTF_8);
-
-            log.info("Decoded params - start: '{}', end: '{}'", start, end);
 
             LocalDateTime startDate = LocalDateTime.parse(start, FORMATTER);
             LocalDateTime endDate = LocalDateTime.parse(end, FORMATTER);
 
             validateDates(startDate, endDate);
 
-            List<ViewStatsDto> result = statsService.getStats(startDate, endDate, uris, unique);
-            log.info("Returning stats result: {}", result);
 
+            if (uris != null && uris.isEmpty()) {
+                uris = null;
+            }
+
+            List<ViewStatsDto> result = statsService.getStats(startDate, endDate, uris, unique);
+
+
+            log.info("Returning stats result (size={}): {}", result.size(), result);
             return result;
 
         } catch (DateTimeParseException e) {
@@ -69,9 +66,6 @@ public class StatsController {
                             start, end),
                     e
             );
-        } catch (Exception e) {
-            log.error("Error processing /stats request", e);
-            throw e;
         }
     }
 
