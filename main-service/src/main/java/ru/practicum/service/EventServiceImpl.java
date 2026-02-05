@@ -163,9 +163,11 @@ public class EventServiceImpl implements EventService {
         return eventMapper.toFullDto(updatedEvent);
     }
 
+    @Override
     public EventFullDto getPublicEvent(Long eventId, HttpServletRequest request) {
         log.info("=== GET PUBLIC EVENT {} ===", eventId);
-        log.info("StatsClient is null? {}", statsClient == null); // ← Проверка
+        log.info("Request URI: {}", request.getRequestURI());
+        log.info("Remote IP: {}", request.getRemoteAddr());
 
         Event event = eventRepository.findByIdAndState(eventId, Event.EventState.PUBLISHED)
                 .orElseThrow(() -> new NotFoundException("Event not found"));
@@ -173,14 +175,14 @@ public class EventServiceImpl implements EventService {
         String ip = request.getRemoteAddr();
         String uri = request.getRequestURI();
 
-        log.info("Will send hit: app=ewm-main-service, uri={}, ip={}", uri, ip);
+        log.info("Sending hit to Stats Service: app=ewm-main-service, uri={}, ip={}", uri, ip);
 
-        // ОТПРАВКА HIT
         try {
             statsClient.hit("ewm-main-service", uri, ip);
-            log.info("Hit sent via StatsClient");
+            log.info("=== Hit sent successfully ===");
         } catch (Exception e) {
-            log.error("Failed to send hit: {}", e.getMessage(), e);
+            log.error("=== Failed to send hit: {} ===", e.getMessage());
+            log.error("Stack trace:", e);
         }
 
         viewService.incrementAndGetViews(eventId, ip);

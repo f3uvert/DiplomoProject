@@ -2,12 +2,15 @@ package ru.practicum.client;
 
 import jakarta.annotation.Nullable;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.*;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestTemplate;
 import ru.practicum.dto.EndpointHitDto;
 import ru.practicum.dto.ViewStatsDto;
 
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
@@ -17,65 +20,20 @@ import java.util.*;
 public class StatsClient {
     private final String serverUrl;
     private final RestTemplate rest;
-    private static final DateTimeFormatter FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
-    public StatsClient(String serverUrl) {
+    public StatsClient(@Value("${stats.service.url}") String serverUrl) {
         this.serverUrl = serverUrl;
         this.rest = new RestTemplate();
-        log.info("StatsClient initialized for URL: {}", serverUrl);
-    }
-
-    public void hit(EndpointHitDto endpointHitDto) {
-        executeSafely(() -> {
-            log.info("Sending hit to stats server: {}", endpointHitDto);
-            makeAndSendRequest(HttpMethod.POST, "/hit", null, endpointHitDto, null);
-            return null;
-        }, "hit");
-    }
-
-    public List<ViewStatsDto> getStats(LocalDateTime start, LocalDateTime end,
-                                       @Nullable List<String> uris,
-                                       @Nullable Boolean unique) {
-        return executeSafely(() -> {
-            Map<String, Object> parameters = new HashMap<>();
-            parameters.put("start", start.format(FORMATTER));
-            parameters.put("end", end.format(FORMATTER));
-
-            StringBuilder path = new StringBuilder("/stats?start={start}&end={end}");
-
-            if (uris != null && !uris.isEmpty()) {
-                parameters.put("uris", String.join(",", uris));
-                path.append("&uris={uris}");
-            }
-
-            if (unique != null) {
-                parameters.put("unique", unique);
-                path.append("&unique={unique}");
-            }
-
-            log.info("Getting stats from stats server: path={}, params={}", path, parameters);
-
-            ResponseEntity<ViewStatsDto[]> response = makeAndSendRequest(
-                    HttpMethod.GET,
-                    path.toString(),
-                    parameters,
-                    null,
-                    ViewStatsDto[].class
-            );
-
-            ViewStatsDto[] body = response != null ? response.getBody() : new ViewStatsDto[0];
-            List<ViewStatsDto> result = body != null ? Arrays.asList(body) : Collections.emptyList();
-
-            log.info("Received stats: {}", result);
-            return result;
-        }, "getStats", Collections.emptyList());
+        log.info("=== STATS CLIENT INITIALIZED ===");
+        log.info("Server URL: {}", serverUrl);
     }
 
     public void hit(String app, String uri, String ip) {
-        log.info("=== STATS CLIENT HIT ===");
-        log.info("Sending hit: app={}, uri={}, ip={}", app, uri, ip);
+        log.info("=== SENDING HIT ===");
+        log.info("App: {}, URI: {}, IP: {}", app, uri, ip);
 
         try {
+            // Создаем DTO
             EndpointHitDto hitDto = EndpointHitDto.builder()
                     .app(app)
                     .uri(uri)
@@ -83,63 +41,99 @@ public class StatsClient {
                     .timestamp(LocalDateTime.now())
                     .build();
 
-            log.info("DTO: {}", hitDto);
-            ResponseEntity<Void> response = rest.postForEntity(
-                    serverUrl + "/hit",
-                    hitDto,
-                    Void.class
+            log.info("Hit DTO: {}", hitDto);
+
+            // Отправляем запрос
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_JSON);
+            headers.setAccept(Collections.singletonList(MediaType.APPLICATION_JSON));
+
+            HttpEntity<EndpointHitDto> requestEntity = new HttpEntity<>(hitDto, headers);
+
+            String url = serverUrl + "/hit";
+            log.info("Sending POST to: {}", url);
+
+            ResponseEntity<String> response = rest.exchange(
+                    url,
+                    HttpMethod.POST,
+                    requestEntity,
+                    String.class
             );
 
             log.info("Response status: {}", response.getStatusCode());
+            log.info("Response body: {}", response.getBody());
 
         } catch (Exception e) {
-            log.error("Failed to send hit: {}", e.getMessage(), e);
+            log.error("=== ERROR SENDING HIT ===");
+            log.error("Error message: {}", e.getMessage());
+            log.error("Stats service URL was: {}", serverUrl);
+            // НЕ бросаем исключение дальше - просто логируем
         }
     }
 
-    private <T> T executeSafely(SupplierWithException<T> supplier, String operation) {
-        return executeSafely(supplier, operation, null);
-    }
+    public void hit(EndpointHitDto endpointHitDto) {
+        log.info("=== SENDING HIT (DTO version) ===");
+        log.info("DTO: {}", endpointHitDto);
 
-    private <T> T executeSafely(SupplierWithException<T> supplier, String operation, T defaultValue) {
         try {
-            return supplier.get();
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_JSON);
+            headers.setAccept(Collections.singletonList(MediaType.APPLICATION_JSON));
+
+            HttpEntity<EndpointHitDto> requestEntity = new HttpEntity<>(endpointHitDto, headers);
+
+            String url = serverUrl + "/hit";
+            log.info("Sending POST to: {}", url);
+
+            ResponseEntity<String> response = rest.exchange(
+                    url,
+                    HttpMethod.POST,
+                    requestEntity,
+                    String.class
+            );
+
+            log.info("Response status: {}", response.getStatusCode());
+            log.info("Response body: {}", response.getBody());
+
         } catch (Exception e) {
-            log.warn("StatsClient operation '{}' failed: {}", operation, e.getMessage());
-            log.debug("Full error:", e);
-            return defaultValue;
+            log.error("=== ERROR SENDING HIT (DTO) ===");
+            log.error("Error message: {}", e.getMessage());
+            log.error("Stats service URL was: {}", serverUrl);
         }
     }
 
-    private <T> ResponseEntity<T> makeAndSendRequest(HttpMethod method, String path,
-                                                     @Nullable Map<String, Object> parameters,
-                                                     @Nullable Object body,
-                                                     Class<T> responseType) {
-        HttpEntity<Object> requestEntity = new HttpEntity<>(body, defaultHeaders());
-
+    public List<ViewStatsDto> getStats(LocalDateTime start, LocalDateTime end,
+                                       List<String> uris, Boolean unique) {
         try {
-            ResponseEntity<T> response;
-            if (parameters != null) {
-                response = rest.exchange(serverUrl + path, method, requestEntity, responseType, parameters);
-            } else {
-                response = rest.exchange(serverUrl + path, method, requestEntity, responseType);
+            // Форматируем даты
+            String startStr = start.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
+            String endStr = end.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
+
+            // Строим URL
+            String url = String.format("%s/stats?start=%s&end=%s",
+                    serverUrl,
+                    URLEncoder.encode(startStr, StandardCharsets.UTF_8),
+                    URLEncoder.encode(endStr, StandardCharsets.UTF_8));
+
+            if (uris != null && !uris.isEmpty()) {
+                url += "&uris=" + String.join(",", uris);
             }
-            log.debug("Stats server response: {}", response.getStatusCode());
-            return response;
+            if (unique != null) {
+                url += "&unique=" + unique;
+            }
+
+            log.info("Getting stats from: {}", url);
+
+            ResponseEntity<ViewStatsDto[]> response = rest.getForEntity(
+                    url,
+                    ViewStatsDto[].class
+            );
+
+            return Arrays.asList(response.getBody());
+
         } catch (Exception e) {
-            throw new RuntimeException("Failed to call stats server: " + e.getMessage(), e);
+            log.error("Error getting stats: {}", e.getMessage());
+            return Collections.emptyList();
         }
-    }
-
-    private HttpHeaders defaultHeaders() {
-        HttpHeaders headers = new HttpHeaders();
-        headers.setContentType(MediaType.APPLICATION_JSON);
-        headers.setAccept(List.of(MediaType.APPLICATION_JSON));
-        return headers;
-    }
-
-    @FunctionalInterface
-    private interface SupplierWithException<T> {
-        T get() throws Exception;
     }
 }
