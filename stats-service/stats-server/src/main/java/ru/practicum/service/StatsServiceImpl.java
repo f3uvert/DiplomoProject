@@ -30,10 +30,10 @@ public class StatsServiceImpl implements StatsService {
                 endpointHitDto.getUri(), endpointHitDto.getIp(), endpointHitDto.getApp());
 
         EndpointHit hit = statsMapper.toEntity(endpointHitDto);
-        statsRepository.save(hit);
-        log.info("Saved to database: ID={}", hit.getId());
+        EndpointHit saved = statsRepository.save(hit);
+        log.info("Saved to database: ID={}", saved.getId());
 
-        return endpointHitDto;
+        return statsMapper.toDto(saved);
     }
 
     @Override
@@ -46,8 +46,6 @@ public class StatsServiceImpl implements StatsService {
 
         List<ViewStatsDto> result;
 
-        // ВАЖНО: uris может быть null, и это нормально
-        // Репозиторий обрабатывает это с помощью (:uris IS NULL OR h.uri IN :uris)
         if (Boolean.TRUE.equals(unique)) {
             result = statsRepository.getUniqueStats(start, end, uris);
         } else {

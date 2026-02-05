@@ -33,12 +33,19 @@ public class StatsController {
 
     @GetMapping("/stats")
     public List<ViewStatsDto> getStats(
-            @RequestParam String start,
-            @RequestParam String end,
+            @RequestParam(required = false) String start,
+            @RequestParam(required = false) String end,
             @RequestParam(required = false) List<String> uris,
             @RequestParam(required = false, defaultValue = "false") Boolean unique) {
 
         log.info("GET /stats called with start={}, end={}, uris={}, unique={}", start, end, uris, unique);
+
+        if (start == null || start.isEmpty()) {
+            throw new IllegalArgumentException("Parameter 'start' is required");
+        }
+        if (end == null || end.isEmpty()) {
+            throw new IllegalArgumentException("Parameter 'end' is required");
+        }
 
         try {
             start = URLDecoder.decode(start, StandardCharsets.UTF_8);
@@ -51,10 +58,6 @@ public class StatsController {
 
             validateDates(startDate, endDate);
 
-            if (uris != null && uris.isEmpty()) {
-                uris = null;
-            }
-
             List<ViewStatsDto> result = statsService.getStats(startDate, endDate, uris, unique);
             log.info("Returning stats result: {}", result);
 
@@ -66,6 +69,9 @@ public class StatsController {
                             start, end),
                     e
             );
+        } catch (Exception e) {
+            log.error("Error processing /stats request", e);
+            throw e;
         }
     }
 
@@ -77,4 +83,5 @@ public class StatsController {
             throw new IllegalArgumentException("End date must be after start date");
         }
     }
+
 }
