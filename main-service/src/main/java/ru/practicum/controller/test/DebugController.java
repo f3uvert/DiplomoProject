@@ -40,7 +40,6 @@ public class DebugController {
                     .ip("192.168.1.101")
                     .timestamp(LocalDateTime.now())
                     .build();
-            statsClient.hit(dto);
             log.info("Method 2: Success");
 
             return "Hits sent successfully";

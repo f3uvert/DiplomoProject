@@ -5,22 +5,24 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.*;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestTemplate;
+import org.springframework.web.util.UriComponentsBuilder;
 import ru.practicum.dto.EndpointHitDto;
 import ru.practicum.dto.ViewStatsDto;
 
-import java.net.URLEncoder;
-import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
-import java.util.*;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
 
 @Component
 @Slf4j
 public class StatsClient {
     private final String serverUrl;
     private final RestTemplate rest;
+    private static final DateTimeFormatter FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
-    public StatsClient(@Value("${stats.service.url}") String serverUrl) {
+    public StatsClient(@Value("${stats.service.url:http://localhost:9090}") String serverUrl) {
         this.serverUrl = serverUrl;
         this.rest = new RestTemplate();
         log.info("=== STATS CLIENT INITIALIZED ===");
@@ -32,7 +34,6 @@ public class StatsClient {
         log.info("App: {}, URI: {}, IP: {}", app, uri, ip);
 
         try {
-            // Создаем DTO
             EndpointHitDto hitDto = EndpointHitDto.builder()
                     .app(app)
                     .uri(uri)
@@ -42,7 +43,6 @@ public class StatsClient {
 
             log.info("Hit DTO: {}", hitDto);
 
-            // Отправляем запрос
             HttpHeaders headers = new HttpHeaders();
             headers.setContentType(MediaType.APPLICATION_JSON);
             headers.setAccept(Collections.singletonList(MediaType.APPLICATION_JSON));
@@ -66,72 +66,35 @@ public class StatsClient {
             log.error("=== ERROR SENDING HIT ===");
             log.error("Error message: {}", e.getMessage());
             log.error("Stats service URL was: {}", serverUrl);
-            // НЕ бросаем исключение дальше - просто логируем
-        }
-    }
-
-    public void hit(EndpointHitDto endpointHitDto) {
-        log.info("=== SENDING HIT (DTO version) ===");
-        log.info("DTO: {}", endpointHitDto);
-
-        try {
-            HttpHeaders headers = new HttpHeaders();
-            headers.setContentType(MediaType.APPLICATION_JSON);
-            headers.setAccept(Collections.singletonList(MediaType.APPLICATION_JSON));
-
-            HttpEntity<EndpointHitDto> requestEntity = new HttpEntity<>(endpointHitDto, headers);
-
-            String url = serverUrl + "/hit";
-            log.info("Sending POST to: {}", url);
-
-            ResponseEntity<String> response = rest.exchange(
-                    url,
-                    HttpMethod.POST,
-                    requestEntity,
-                    String.class
-            );
-
-            log.info("Response status: {}", response.getStatusCode());
-            log.info("Response body: {}", response.getBody());
-
-        } catch (Exception e) {
-            log.error("=== ERROR SENDING HIT (DTO) ===");
-            log.error("Error message: {}", e.getMessage());
-            log.error("Stats service URL was: {}", serverUrl);
+            e.printStackTrace(); // Добавьте это для отладки
         }
     }
 
     public List<ViewStatsDto> getStats(LocalDateTime start, LocalDateTime end,
                                        List<String> uris, Boolean unique) {
         try {
-            // Форматируем даты
-            String startStr = start.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
-            String endStr = end.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
-
-            // Строим URL
-            String url = String.format("%s/stats?start=%s&end=%s",
-                    serverUrl,
-                    URLEncoder.encode(startStr, StandardCharsets.UTF_8),
-                    URLEncoder.encode(endStr, StandardCharsets.UTF_8));
+            UriComponentsBuilder builder = UriComponentsBuilder.fromHttpUrl(serverUrl + "/stats")
+                    .queryParam("start", start.format(FORMATTER))
+                    .queryParam("end", end.format(FORMATTER));
 
             if (uris != null && !uris.isEmpty()) {
-                url += "&uris=" + String.join(",", uris);
-            }
-            if (unique != null) {
-                url += "&unique=" + unique;
+                uris.forEach(uri -> builder.queryParam("uris", uri));
             }
 
+            if (unique != null) {
+                builder.queryParam("unique", unique);
+            }
+
+            String url = builder.toUriString();
             log.info("Getting stats from: {}", url);
 
-            ResponseEntity<ViewStatsDto[]> response = rest.getForEntity(
-                    url,
-                    ViewStatsDto[].class
-            );
+            ResponseEntity<ViewStatsDto[]> response = rest.getForEntity(url, ViewStatsDto[].class);
 
             return Arrays.asList(response.getBody());
 
         } catch (Exception e) {
             log.error("Error getting stats: {}", e.getMessage());
+            e.printStackTrace(); // Добавьте это для отладки
             return Collections.emptyList();
         }
     }
