@@ -51,7 +51,7 @@ services:
       timeout: 5s
       retries: 3
 
-  ewm-main-service:
+  ewm-service:
     build:
       context: .  # корень проекта
       dockerfile: docker/main-service/Dockerfile
