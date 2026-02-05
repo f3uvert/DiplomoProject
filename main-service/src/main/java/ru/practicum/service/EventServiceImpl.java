@@ -295,24 +295,37 @@ public class EventServiceImpl implements EventService {
     }
 
     private Long getEventViews(Long eventId) {
-        LocalDateTime start = LocalDateTime.now().minusYears(1);
-        LocalDateTime end = LocalDateTime.now();
-        String uri = "/events/" + eventId;
-
-        log.debug("Getting stats for event {} with uri: {}", eventId, uri);
-
-        List<ViewStatsDto> stats = Collections.emptyList();
-
         try {
-            stats = statsClient.getStats(
-                    start, end, List.of(uri), true
-            );
-            log.debug("Received stats for event {}: {}", eventId, stats);
-        } catch (Exception e) {
-            log.warn("Failed to get stats for event {}: {}", eventId, e.getMessage());
-        }
+            LocalDateTime start = LocalDateTime.now().minusYears(1);
+            LocalDateTime end = LocalDateTime.now();
+            String uri = "/events/" + eventId;
 
-        return stats.isEmpty() ? 0L : stats.get(0).getHits();
+            log.info("Getting views for event {} from stats service. URI: {}", eventId, uri);
+            log.info("Time range: {} to {}", start, end);
+
+            List<ViewStatsDto> stats = statsClient.getStats(
+                    start,
+                    end,
+                    Collections.singletonList(uri),
+                    true
+            );
+
+            log.info("Stats received for event {}: {}", eventId, stats);
+
+            if (stats.isEmpty()) {
+                log.info("No stats found for event {}, returning 0", eventId);
+                return 0L;
+            }
+
+            ViewStatsDto viewStats = stats.get(0);
+            long views = viewStats.getHits();
+            log.info("Event {} has {} views (unique)", eventId, views);
+
+            return views;
+        } catch (Exception e) {
+            log.error("Failed to get views for event {}: {}", eventId, e.getMessage(), e);
+            return 0L;
+        }
     }
 
     private Map<Long, Long> getEventsViews(List<Long> eventIds) {

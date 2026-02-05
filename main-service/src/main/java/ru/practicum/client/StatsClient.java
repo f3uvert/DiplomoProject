@@ -1,4 +1,3 @@
-// stats-service/stats-client/src/main/java/ru/practicum/client/StatsClient.java
 package ru.practicum.client;
 
 import jakarta.annotation.Nullable;
@@ -26,6 +25,7 @@ public class StatsClient {
 
     public void hit(EndpointHitDto endpointHitDto) {
         executeSafely(() -> {
+            log.info("Sending hit to stats server: {}", endpointHitDto);
             makeAndSendRequest(HttpMethod.POST, "/hit", null, endpointHitDto, null);
             return null;
         }, "hit");
@@ -51,6 +51,8 @@ public class StatsClient {
                 path.append("&unique={unique}");
             }
 
+            log.info("Getting stats from stats server: path={}, params={}", path, parameters);
+
             ResponseEntity<ViewStatsDto[]> response = makeAndSendRequest(
                     HttpMethod.GET,
                     path.toString(),
@@ -59,7 +61,11 @@ public class StatsClient {
                     ViewStatsDto[].class
             );
 
-            return response != null ? Arrays.asList(Objects.requireNonNull(response.getBody())) : Collections.emptyList();
+            ViewStatsDto[] body = response != null ? response.getBody() : new ViewStatsDto[0];
+            List<ViewStatsDto> result = body != null ? Arrays.asList(body) : Collections.emptyList();
+
+            log.info("Received stats: {}", result);
+            return result;
         }, "getStats", Collections.emptyList());
     }
 
@@ -71,6 +77,8 @@ public class StatsClient {
                     .ip(ip)
                     .timestamp(LocalDateTime.now())
                     .build();
+
+            log.info("Sending hit: app={}, uri={}, ip={}", app, uri, ip);
             hit(hitDto);
             return null;
         }, "hitString");
@@ -97,11 +105,14 @@ public class StatsClient {
         HttpEntity<Object> requestEntity = new HttpEntity<>(body, defaultHeaders());
 
         try {
+            ResponseEntity<T> response;
             if (parameters != null) {
-                return rest.exchange(serverUrl + path, method, requestEntity, responseType, parameters);
+                response = rest.exchange(serverUrl + path, method, requestEntity, responseType, parameters);
             } else {
-                return rest.exchange(serverUrl + path, method, requestEntity, responseType);
+                response = rest.exchange(serverUrl + path, method, requestEntity, responseType);
             }
+            log.debug("Stats server response: {}", response.getStatusCode());
+            return response;
         } catch (Exception e) {
             throw new RuntimeException("Failed to call stats server: " + e.getMessage(), e);
         }
