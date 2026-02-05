@@ -107,10 +107,18 @@ public class EventServiceImpl implements EventService {
     public List<EventFullDto> getAdminEvents(List<Long> users, List<Event.EventState> states,
                                              List<Long> categories, LocalDateTime rangeStart,
                                              LocalDateTime rangeEnd, int from, int size) {
+
+        List<String> stateStrings = null;
+        if (states != null) {
+            stateStrings = states.stream()
+                    .map(Enum::name)
+                    .collect(Collectors.toList());
+        }
+
         Pageable pageable = PageRequest.of(from / size, size);
 
         List<Event> events = eventRepository.findAdminEvents(
-                users, states, categories, rangeStart, rangeEnd, pageable
+                users, stateStrings, categories, rangeStart, rangeEnd, pageable  // ← передаем строки
         );
 
         return events.stream()
