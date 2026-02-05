@@ -38,34 +38,29 @@ public class StatsController {
             @RequestParam(required = false) List<String> uris,
             @RequestParam(required = false, defaultValue = "false") Boolean unique) {
 
-        log.info("GET /stats called with start={}, end={}, uris={}, unique={}", start, end, uris, unique);
+        log.info("Raw params received - start: '{}', end: '{}'", start, end);
 
         try {
-            start = URLDecoder.decode(start, StandardCharsets.UTF_8);
-            end = URLDecoder.decode(end, StandardCharsets.UTF_8);
+            start = URLDecoder.decode(start, StandardCharsets.UTF_8.toString());
+            end = URLDecoder.decode(end, StandardCharsets.UTF_8.toString());
+
+            log.info("Decoded params - start: '{}', end: '{}'", start, end);
 
             LocalDateTime startDate = LocalDateTime.parse(start, FORMATTER);
             LocalDateTime endDate = LocalDateTime.parse(end, FORMATTER);
 
             validateDates(startDate, endDate);
 
-
-            if (uris != null && uris.isEmpty()) {
-                uris = null;
-            }
-
-            List<ViewStatsDto> result = statsService.getStats(startDate, endDate, uris, unique);
-
-
-            log.info("Returning stats result (size={}): {}", result.size(), result);
-            return result;
+            return statsService.getStats(startDate, endDate, uris, unique);
 
         } catch (DateTimeParseException e) {
             throw new IllegalArgumentException(
-                    String.format("Invalid date format. Expected: yyyy-MM-dd HH:mm:ss. Received: start='%s', end='%s'",
-                            start, end),
+                    String.format("Invalid date format. Expected: yyyy-MM-dd HH:mm:ss. Received: start='%s', end='%s'. Error: %s",
+                            start, end, e.getMessage()),
                     e
             );
+        } catch (Exception e) {
+            throw new IllegalArgumentException("Error processing request: " + e.getMessage(), e);
         }
     }
 
@@ -77,5 +72,4 @@ public class StatsController {
             throw new IllegalArgumentException("End date must be after start date");
         }
     }
-
 }
