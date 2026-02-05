@@ -47,19 +47,24 @@ public class StatsServiceImpl implements StatsService {
 
         List<ViewStatsDto> result;
 
-        if (Boolean.TRUE.equals(unique)) {
-            result = statsRepository.getUniqueStats(start, end, uris);
-        } else {
-            result = statsRepository.getStats(start, end, uris);
-        }
+        try {
+            if (Boolean.TRUE.equals(unique)) {
+                result = statsRepository.getUniqueStats(start, end, uris);
+            } else {
+                result = statsRepository.getStats(start, end, uris);
+            }
 
-        // ВАЖНО: Всегда возвращаем список, даже если пустой
-        if (result == null) {
-            result = Collections.emptyList();
-        }
+            if (result == null) {
+                return Collections.emptyList();
+            }
 
-        log.info("Result from DB: {}", result);
-        return result;
+            log.info("Result from DB: {}", result);
+            return result;
+
+        } catch (Exception e) {
+            log.error("Error getting stats from database: {}", e.getMessage(), e);
+            return Collections.emptyList();
+        }
     }
 
     private void validateDates(LocalDateTime start, LocalDateTime end) {
