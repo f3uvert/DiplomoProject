@@ -40,6 +40,7 @@ public class EventServiceImpl implements EventService {
     private final UserRepository userRepository;
     private final EventMapper eventMapper;
     private final StatsClient statsClient;
+    private final ViewService viewService;
 
     @Override
     @Transactional
@@ -167,22 +168,27 @@ public class EventServiceImpl implements EventService {
         Event event = eventRepository.findByIdAndState(eventId, Event.EventState.PUBLISHED)
                 .orElseThrow(() -> new NotFoundException("Event not found"));
 
-        log.info("Sending hit for event {} from IP {}", eventId, request.getRemoteAddr());
+        String ip = request.getRemoteAddr();
+        String uri = request.getRequestURI();
+
+        log.info("Public GET request for event {} from IP: {}", eventId, ip);
+
+        Long views = viewService.incrementAndGetViews(eventId, ip);
+
+        log.info("Event {} now has {} views (local cache)", eventId, views);
 
         try {
             statsClient.hit(
                     "ewm-main-service",
-                    request.getRequestURI(),
-                    request.getRemoteAddr()
+                    uri,
+                    ip
             );
+            log.info("Hit sent to stats service for event {}", eventId);
         } catch (Exception e) {
             log.warn("Failed to send stats hit: {}", e.getMessage());
         }
 
-        Long views = getEventViews(eventId);
-
-        log.info("Event {} has {} views", eventId, views);
-
+        // Устанавливаем views в событие
         event.setViews(views);
 
         return eventMapper.toFullDto(event);
@@ -300,32 +306,22 @@ public class EventServiceImpl implements EventService {
             LocalDateTime end = LocalDateTime.now();
             String uri = "/events/" + eventId;
 
-            log.info("Getting views for event {} from stats service. URI: {}", eventId, uri);
-            log.info("Time range: {} to {}", start, end);
-
             List<ViewStatsDto> stats = statsClient.getStats(
-                    start,
-                    end,
-                    Collections.singletonList(uri),
-                    true
+                    start, end, Collections.singletonList(uri), true
             );
 
-            log.info("Stats received for event {}: {}", eventId, stats);
-
-            if (stats.isEmpty()) {
-                log.info("No stats found for event {}, returning 0", eventId);
-                return 0L;
+            if (!stats.isEmpty()) {
+                log.debug("Stats service returned {} views for event {}",
+                        stats.get(0).getHits(), eventId);
+                return stats.get(0).getHits();
             }
-
-            ViewStatsDto viewStats = stats.get(0);
-            long views = viewStats.getHits();
-            log.info("Event {} has {} views (unique)", eventId, views);
-
-            return views;
         } catch (Exception e) {
-            log.error("Failed to get views for event {}: {}", eventId, e.getMessage(), e);
-            return 0L;
+            log.warn("Could not get views from stats service: {}", e.getMessage());
         }
+
+        Long localViews = viewService.getViews(eventId);
+        log.debug("Using local cache: {} views for event {}", localViews, eventId);
+        return localViews;
     }
 
     private Map<Long, Long> getEventsViews(List<Long> eventIds) {
