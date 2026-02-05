@@ -109,21 +109,16 @@ public class EventServiceImpl implements EventService {
                                              List<Long> categories, LocalDateTime rangeStart,
                                              LocalDateTime rangeEnd, int from, int size) {
 
-        Pageable pageable = PageRequest.of(from / size, size);
+        Pageable pageable = PageRequest.of(from / size, size, Sort.by("id").ascending());
 
-        List<Event> events;
-        if (users == null && states == null && categories == null && rangeStart == null && rangeEnd == null) {
-            events = eventRepository.findAll(pageable).getContent();
-        } else {
+        List<Event> events = eventRepository.findEventsWithOptionalFilters(users, states, categories, pageable);
 
-            LocalDateTime start = rangeStart != null ? rangeStart : LocalDateTime.MIN;
-            LocalDateTime end = rangeEnd != null ? rangeEnd : LocalDateTime.MAX;
+        List<Event> filteredEvents = events.stream()
+                .filter(event -> rangeStart == null || !event.getEventDate().isBefore(rangeStart))
+                .filter(event -> rangeEnd == null || !event.getEventDate().isAfter(rangeEnd))
+                .collect(Collectors.toList());
 
-            events = eventRepository.findAdminEvents(
-                    users, states, categories, start, end, pageable
-            );
-        }
-        return events.stream()
+        return filteredEvents.stream()
                 .map(eventMapper::toFullDto)
                 .collect(Collectors.toList());
     }
