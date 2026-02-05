@@ -131,8 +131,13 @@ public class EventServiceImpl implements EventService {
 
         if (updateRequest.getEventDate() != null) {
             LocalDateTime newEventDate = updateRequest.getEventDate();
-            if (newEventDate.isBefore(LocalDateTime.now().plusHours(1))) {
+
+            if (event.getPublishedOn() != null && newEventDate.isBefore(event.getPublishedOn().plusHours(1))) {
                 throw new ConflictException("Event date must be at least 1 hour from publication");
+            }
+
+            if (newEventDate.isBefore(LocalDateTime.now())) {
+                throw new ValidationException("Event date cannot be in the past");
             }
         }
 
@@ -162,13 +167,22 @@ public class EventServiceImpl implements EventService {
         Event event = eventRepository.findByIdAndState(eventId, Event.EventState.PUBLISHED)
                 .orElseThrow(() -> new NotFoundException("Event not found"));
 
-        statsClient.hit(
-                "ewm-main-service",
-                request.getRequestURI(),
-                request.getRemoteAddr()
-        );
+        log.info("Sending hit for event {} from IP {}", eventId, request.getRemoteAddr());
+
+        try {
+            statsClient.hit(
+                    "ewm-main-service",
+                    request.getRequestURI(),
+                    request.getRemoteAddr()
+            );
+        } catch (Exception e) {
+            log.warn("Failed to send stats hit: {}", e.getMessage());
+        }
 
         Long views = getEventViews(eventId);
+
+        log.info("Event {} has {} views", eventId, views);
+
         event.setViews(views);
 
         return eventMapper.toFullDto(event);
@@ -179,6 +193,10 @@ public class EventServiceImpl implements EventService {
                                                LocalDateTime rangeStart, LocalDateTime rangeEnd,
                                                Boolean onlyAvailable, String sort,
                                                int from, int size, HttpServletRequest request) {
+
+        if (rangeStart != null && rangeEnd != null && rangeEnd.isBefore(rangeStart)) {
+            throw new ValidationException("RangeEnd cannot be before rangeStart");
+        }
 
         try {
             statsClient.hit(
@@ -281,9 +299,18 @@ public class EventServiceImpl implements EventService {
         LocalDateTime end = LocalDateTime.now();
         String uri = "/events/" + eventId;
 
-        List<ViewStatsDto> stats = statsClient.getStats(
-                start, end, List.of(uri), true
-        );
+        log.debug("Getting stats for event {} with uri: {}", eventId, uri);
+
+        List<ViewStatsDto> stats = Collections.emptyList();
+
+        try {
+            stats = statsClient.getStats(
+                    start, end, List.of(uri), true
+            );
+            log.debug("Received stats for event {}: {}", eventId, stats);
+        } catch (Exception e) {
+            log.warn("Failed to get stats for event {}: {}", eventId, e.getMessage());
+        }
 
         return stats.isEmpty() ? 0L : stats.get(0).getHits();
     }
