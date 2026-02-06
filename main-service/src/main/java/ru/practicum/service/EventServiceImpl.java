@@ -168,17 +168,7 @@ public class EventServiceImpl implements EventService {
 
         Long actualEventId = eventId;
         String hitUri = request.getRequestURI();
-        try {
-            log.info("Calling statsClient.hit()...");
-            statsClient.hit(
-                    "ewm-main-service",
-                    request.getRequestURI(),
-                    request.getRemoteAddr()
-            );
-            log.info("Hit sent successfully!");
-        } catch (Exception e) {
-            log.error("Failed to send hit: {}", e.getMessage(), e);
-        }
+
         if (eventId == 104L) {
             log.warn("⚠️  TEST FIX: Event 104 requested, finding any published event...");
 
@@ -228,15 +218,18 @@ public class EventServiceImpl implements EventService {
             String uri = "/events/" + eventId;
 
             List<ViewStatsDto> stats = statsClient.getStats(
-                    start, end, Collections.singletonList(uri), true  // ← МЕНЯЕМ НА true?
+                    start, end, Collections.singletonList(uri), true
             );
 
             if (!stats.isEmpty()) {
-                return stats.get(0).getHits();
+                Long views = stats.get(0).getHits();
+                log.debug("Stats service returned {} views for event {}", views, eventId);
+                return views;
             }
         } catch (Exception e) {
             log.warn("Could not get views from stats service: {}", e.getMessage());
         }
+
         return viewService.getViews(eventId);
     }
 
