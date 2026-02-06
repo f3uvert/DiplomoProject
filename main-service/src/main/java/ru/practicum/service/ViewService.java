@@ -13,17 +13,12 @@ public class ViewService {
     public Long incrementAndGetViews(Long eventId, String ip) {
         String key = eventId + "_" + ip;
 
-        log.info("Checking views for event {} from IP {}. Key: {}", eventId, ip, key);
-
         if (ipEventViews.containsKey(key)) {
-            log.info("IP {} already viewed event {}. Not counting.", ip, eventId);
-            // Если уже был, возвращаем текущее количество уникальных просмотров
             return getViews(eventId);
         }
 
         ipEventViews.put(key, true);
         Long totalViews = getViews(eventId);
-        log.info("First view from IP {} for event {}. Total views now: {}", ip, eventId, totalViews);
 
         return totalViews;
     }

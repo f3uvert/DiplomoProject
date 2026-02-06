@@ -228,18 +228,15 @@ public class EventServiceImpl implements EventService {
             String uri = "/events/" + eventId;
 
             List<ViewStatsDto> stats = statsClient.getStats(
-                    start, end, Collections.singletonList(uri), true
+                    start, end, Collections.singletonList(uri), false
             );
 
             if (!stats.isEmpty()) {
-                Long views = stats.get(0).getHits();
-                log.debug("Stats service returned {} views for event {}", views, eventId);
-                return views;
+                return stats.get(0).getHits();
             }
         } catch (Exception e) {
             log.warn("Could not get views from stats service: {}", e.getMessage());
         }
-
         return viewService.getViews(eventId);
     }
 
