@@ -1,70 +1,38 @@
-# docker-compose.yml
+version: '3.8'
+
 services:
-  ewm-db:
-    image: postgres:14-alpine
-    container_name: ewm-db
-    environment:
-      POSTGRES_DB: ewm_main_db
-      POSTGRES_USER: admin
-      POSTGRES_PASSWORD: password
-    ports:
-      - "5432:5432"
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U admin"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
-      start_period: 10s
-
-  stats-db:
-    image: postgres:14-alpine
-    container_name: stats-db
-    environment:
-      POSTGRES_DB: ewm_stats_db
-      POSTGRES_USER: admin
-      POSTGRES_PASSWORD: password
-    ports:
-      - "5433:5432"
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U admin"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
-      start_period: 10s
-
+  # Для локальной разработки базы не нужны, используем H2
   stats-server:
     build:
       context: .
       dockerfile: docker/stats-server/Dockerfile
     container_name: stats-server
     ports:
-      - "9090:9090"  # Spring Boot порт
-    # НЕ зависит от базы!
+      - "9090:9090"
     environment:
-      # Принудительно указываем порт
-      SERVER_PORT: 9090
-      SERVER_ADDRESS: 0.0.0.0
-    # Простой healthcheck
+      - SPRING_PROFILES_ACTIVE=docker
     healthcheck:
-      test: [ "CMD-SHELL", "curl -f http://127.0.0.1:9090/actuator/health || exit 1" ]
+      test: ["CMD-SHELL", "curl -f http://localhost:9090/actuator/health || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 3
+      start_period: 30s
 
   ewm-main-service:
     build:
-      context: .  # корень проекта
+      context: .
       dockerfile: docker/main-service/Dockerfile
     container_name: ewm-main-service
     ports:
       - "8080:8080"
     depends_on:
-      ewm-db:
-        condition: service_healthy
       stats-server:
-        condition: service_started
+        condition: service_healthy
     environment:
-      SPRING_DATASOURCE_URL: jdbc:postgresql://ewm-db:5432/ewm_main_db
-      SPRING_DATASOURCE_USERNAME: admin
-      SPRING_DATASOURCE_PASSWORD: password
-      STATS_SERVER_URL: http://stats-server:9090
+      - SPRING_PROFILES_ACTIVE=docker
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8080/actuator/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
