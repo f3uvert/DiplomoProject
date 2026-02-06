@@ -33,7 +33,7 @@ services:
       start_period: 10s
 
   stats-server:
-    build: .stats-service/stats-server
+    build: stats-service/stats-server
     ports:
       - "9090:9090"
 
