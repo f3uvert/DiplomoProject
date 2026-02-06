@@ -228,7 +228,7 @@ public class EventServiceImpl implements EventService {
             String uri = "/events/" + eventId;
 
             List<ViewStatsDto> stats = statsClient.getStats(
-                    start, end, Collections.singletonList(uri), false
+                    start, end, Collections.singletonList(uri), true  // ← МЕНЯЕМ НА true?
             );
 
             if (!stats.isEmpty()) {
