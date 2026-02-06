@@ -8,11 +8,12 @@ import org.springframework.web.client.HttpStatusCodeException;
 import org.springframework.web.client.RestTemplate;
 import ru.practicum.dto.EndpointHitDto;
 import ru.practicum.dto.ViewStatsDto;
-
+import lombok.extern.slf4j.Slf4j;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
 
+@Slf4j
 public class StatsClient {
     private final String serverUrl;
     private final RestTemplate rest;
@@ -58,12 +59,17 @@ public class StatsClient {
     }
 
     public void hit(String app, String uri, String ip) {
+        log.info("=== SENDING HIT (String version) ===");
+        log.info("App: '{}', URI: '{}', IP: '{}'", app, uri, ip);
+        log.info("Server URL: {}", serverUrl);
+
         EndpointHitDto hitDto = EndpointHitDto.builder()
                 .app(app)
                 .uri(uri)
                 .ip(ip)
                 .timestamp(LocalDateTime.now())
                 .build();
+
         hit(hitDto);
     }
 
