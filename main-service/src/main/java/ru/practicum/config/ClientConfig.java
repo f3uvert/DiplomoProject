@@ -1,4 +1,3 @@
-// main-service/src/main/java/ru/practicum/config/ClientConfig.java
 package ru.practicum.config;
 
 import lombok.extern.slf4j.Slf4j;
@@ -20,7 +19,6 @@ public class ClientConfig {
 
     @Bean
     public StatsClient statsClient() {
-        // Для работы внутри Docker используем docker URL
         log.info("Creating StatsClient with Docker URL: {}", statsServerUrlDocker);
         return new StatsClient(statsServerUrlDocker);
     }

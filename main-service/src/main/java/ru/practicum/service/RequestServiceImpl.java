@@ -63,7 +63,6 @@ public class RequestServiceImpl implements RequestService {
 
         if (!event.getRequestModeration() || event.getParticipantLimit() == 0) {
             request.setStatus(ParticipationRequest.Status.CONFIRMED);
-            // Обновляем счетчик подтвержденных заявок в событии
             event.setConfirmedRequests(event.getConfirmedRequests() + 1);
             eventRepository.save(event);
         }

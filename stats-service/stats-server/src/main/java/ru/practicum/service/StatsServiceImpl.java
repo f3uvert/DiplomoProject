@@ -134,7 +134,7 @@ public class StatsServiceImpl implements StatsService {
                 long hits = getHitsForUri(uri, unique);
 
                 ViewStatsDto dto = ViewStatsDto.builder()
-                        .app("ewm-main-service") // фиксированное значение
+                        .app("ewm-main-service")
                         .uri(uri)
                         .hits(hits)
                         .build();
@@ -148,7 +148,7 @@ public class StatsServiceImpl implements StatsService {
                 long hits = getHitsForUri(uri, unique);
 
                 ViewStatsDto dto = ViewStatsDto.builder()
-                        .app("ewm-main-service") // фиксированное значение
+                        .app("ewm-main-service")
                         .uri(uri)
                         .hits(hits)
                         .build();
