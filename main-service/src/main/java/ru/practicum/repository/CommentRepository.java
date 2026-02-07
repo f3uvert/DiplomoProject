@@ -31,12 +31,10 @@ public interface CommentRepository extends JpaRepository<Comment, Long> {
     @Query("SELECT c FROM Comment c " +
             "WHERE (:users IS NULL OR c.author.id IN :users) " +
             "AND (:events IS NULL OR c.event.id IN :events) " +
-            "AND (:statuses IS NULL OR c.status IN :statuses) " +
-            "AND (:text IS NULL OR c.text LIKE CONCAT('%', :text, '%'))")
+            "AND (:statuses IS NULL OR c.status IN :statuses)")
     List<Comment> findAdminComments(@Param("users") List<Long> users,
                                     @Param("events") List<Long> events,
                                     @Param("statuses") List<CommentStatus> statuses,
-                                    @Param("text") String text,
                                     Pageable pageable);
 
     Long countByEventIdAndStatus(Long eventId, CommentStatus status);

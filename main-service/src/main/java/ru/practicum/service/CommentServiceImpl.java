@@ -174,7 +174,14 @@ public class CommentServiceImpl implements CommentService {
         Pageable pageable = PageRequest.of(from / size, size);
 
         List<Comment> comments = commentRepository.findAdminComments(
-                users, events, statuses, text, pageable);
+                users, events, statuses, pageable);
+
+        if (text != null && !text.trim().isEmpty()) {
+            String searchText = text.toLowerCase().trim();
+            comments = comments.stream()
+                    .filter(c -> c.getText().toLowerCase().contains(searchText))
+                    .collect(Collectors.toList());
+        }
 
         return comments.stream()
                 .map(commentMapper::toDto)
