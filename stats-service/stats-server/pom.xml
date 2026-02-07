@@ -5,7 +5,6 @@
          http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
 
-    <!-- Родитель - Spring Boot, НЕ наш проект -->
     <parent>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-starter-parent</artifactId>
@@ -18,7 +17,6 @@
     <version>0.0.1-SNAPSHOT</version>
 
     <dependencies>
-        <!-- ОБЯЗАТЕЛЬНО по ТЗ -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-actuator</artifactId>
@@ -29,14 +27,12 @@
             <scope>runtime</scope>
         </dependency>
 
-        <!-- Наши модули -->
         <dependency>
             <groupId>ru.practicum</groupId>
             <artifactId>stats-dto</artifactId>
             <version>0.0.1-SNAPSHOT</version>
         </dependency>
 
-        <!-- Spring Boot зависимости -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-web</artifactId>

@@ -37,13 +37,10 @@ services:
       dockerfile: docker/stats-server/Dockerfile
     container_name: stats-server
     ports:
-      - "9090:9090"  # Spring Boot порт
-    # НЕ зависит от базы!
+      - "9090:9090"
     environment:
-      # Принудительно указываем порт
       SERVER_PORT: 9090
       SERVER_ADDRESS: 0.0.0.0
-    # Простой healthcheck
     healthcheck:
       test: [ "CMD-SHELL", "curl -f http://127.0.0.1:9090/actuator/health || exit 1" ]
       interval: 10s
@@ -52,7 +49,7 @@ services:
 
   ewm-main-service:
     build:
-      context: .  # корень проекта
+      context: .
       dockerfile: docker/main-service/Dockerfile
     container_name: ewm-main-service
     ports:

@@ -29,7 +29,7 @@ public class NewEventDto {
 
     @NotBlank(message = "Event date cannot be blank")
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
-    private String eventDate; // String, не LocalDateTime!
+    private String eventDate;
 
     @NotNull(message = "Location cannot be null")
     private LocationDto location;

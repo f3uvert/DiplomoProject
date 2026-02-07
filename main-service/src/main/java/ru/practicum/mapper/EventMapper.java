@@ -42,6 +42,10 @@ public class EventMapper {
     }
 
     public EventFullDto toFullDto(Event entity) {
+        return toFullDto(entity, 0L); // По умолчанию 0 комментариев
+    }
+
+    public EventFullDto toFullDto(Event entity, Long commentsCount) {
         LocationDto locationDto = null;
         if (entity.getLocation() != null) {
             locationDto = LocationDto.builder()
@@ -71,10 +75,15 @@ public class EventMapper {
                 .state(entity.getState() != null ? entity.getState().name() : null)
                 .title(entity.getTitle())
                 .views(entity.getViews() != null ? entity.getViews() : 0L)
+                .commentsCount(commentsCount != null ? commentsCount : 0L)
                 .build();
     }
 
     public EventShortDto toShortDto(Event entity) {
+        return toShortDto(entity, 0L);
+    }
+
+    public EventShortDto toShortDto(Event entity, Long commentsCount) {
         return EventShortDto.builder()
                 .id(entity.getId())
                 .annotation(entity.getAnnotation())
@@ -87,6 +96,7 @@ public class EventMapper {
                 .paid(entity.getPaid())
                 .title(entity.getTitle())
                 .views(entity.getViews() != null ? entity.getViews() : 0L)
+                .commentsCount(commentsCount != null ? commentsCount : 0L)
                 .build();
     }
 }

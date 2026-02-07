@@ -1,6 +1,7 @@
 package ru.practicum.service;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -17,8 +18,11 @@ import ru.practicum.repository.EventRepository;
 
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
@@ -27,6 +31,7 @@ public class CompilationServiceImpl implements CompilationService {
     private final CompilationRepository compilationRepository;
     private final EventRepository eventRepository;
     private final CompilationMapper compilationMapper;
+    private final CommentService commentService;
 
     @Override
     @Transactional
@@ -38,7 +43,8 @@ public class CompilationServiceImpl implements CompilationService {
 
         Compilation compilation = compilationMapper.toEntity(compilationDto, events);
         Compilation savedCompilation = compilationRepository.save(compilation);
-        return compilationMapper.toDto(savedCompilation);
+
+        return enrichCompilationWithCommentsCount(savedCompilation);
     }
 
     @Override
@@ -70,7 +76,7 @@ public class CompilationServiceImpl implements CompilationService {
         }
 
         Compilation updatedCompilation = compilationRepository.save(compilation);
-        return compilationMapper.toDto(updatedCompilation);
+        return enrichCompilationWithCommentsCount(updatedCompilation);
     }
 
     @Override
@@ -84,13 +90,38 @@ public class CompilationServiceImpl implements CompilationService {
             compilations = compilationRepository.findAll(pageable).getContent();
         }
 
-        return compilationMapper.toDtoList(compilations);
+        return compilations.stream()
+                .map(this::enrichCompilationWithCommentsCount)
+                .collect(Collectors.toList());
     }
 
     @Override
     public CompilationDto getCompilation(Long compId) {
         Compilation compilation = compilationRepository.findById(compId)
                 .orElseThrow(() -> new NotFoundException("Compilation with id=" + compId + " was not found"));
-        return compilationMapper.toDto(compilation);
+
+        return enrichCompilationWithCommentsCount(compilation);
+    }
+
+    private CompilationDto enrichCompilationWithCommentsCount(Compilation compilation) {
+        CompilationDto dto = compilationMapper.toDto(compilation);
+
+        if (dto.getEvents() != null && !dto.getEvents().isEmpty()) {
+            List<Long> eventIds = dto.getEvents().stream()
+                    .map(event -> event.getId())
+                    .collect(Collectors.toList());
+
+            Map<Long, Long> commentsCountMap = commentService.getCommentsCountForEvents(eventIds);
+
+            dto.setEvents(dto.getEvents().stream()
+                    .map(eventShortDto -> {
+                        Long commentsCount = commentsCountMap.getOrDefault(eventShortDto.getId(), 0L);
+                        eventShortDto.setCommentsCount(commentsCount);
+                        return eventShortDto;
+                    })
+                    .collect(Collectors.toList()));
+        }
+
+        return dto;
     }
 }

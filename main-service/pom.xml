@@ -20,14 +20,12 @@
     </properties>
 
     <dependencies>
-        <!-- Stats client -->
         <dependency>
             <groupId>ru.practicum</groupId>
             <artifactId>stats-client</artifactId>
             <version>${project.version}</version>
         </dependency>
 
-        <!-- Spring Boot starters -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-web</artifactId>
@@ -45,7 +43,6 @@
             <artifactId>spring-boot-starter-actuator</artifactId>
         </dependency>
 
-        <!-- Database -->
         <dependency>
             <groupId>org.postgresql</groupId>
             <artifactId>postgresql</artifactId>
@@ -57,20 +54,17 @@
             <scope>runtime</scope>
         </dependency>
 
-        <!-- Lombok (ОДИН раз!) -->
         <dependency>
             <groupId>org.projectlombok</groupId>
             <artifactId>lombok</artifactId>
             <optional>true</optional>
         </dependency>
 
-        <!-- Для работы с JSON и датами -->
         <dependency>
             <groupId>com.fasterxml.jackson.datatype</groupId>
             <artifactId>jackson-datatype-jsr310</artifactId>
         </dependency>
 
-        <!-- Для работы с HttpServletRequest (ВАЖНО: javax, не jakarta!) -->
         <dependency>
             <groupId>javax.servlet</groupId>
             <artifactId>javax.servlet-api</artifactId>
@@ -78,27 +72,17 @@
             <scope>provided</scope>
         </dependency>
 
-        <!-- JAXB API для валидации -->
         <dependency>
             <groupId>javax.xml.bind</groupId>
             <artifactId>jaxb-api</artifactId>
             <version>2.3.1</version>
         </dependency>
 
-        <!-- Micrometer -->
         <dependency>
             <groupId>io.micrometer</groupId>
             <artifactId>micrometer-observation</artifactId>
         </dependency>
 
-        <!-- УДАЛИТЬ дубликаты tomcat-embed-core!
-             Он уже приходит через spring-boot-starter-web -->
-        <!--
-        <dependency>
-            <groupId>org.apache.tomcat.embed</groupId>
-            <artifactId>tomcat-embed-core</artifactId>
-        </dependency>
-        -->
     </dependencies>
 
     <build>

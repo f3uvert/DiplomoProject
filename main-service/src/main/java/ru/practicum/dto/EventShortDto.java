@@ -6,7 +6,6 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-
 @Data
 @Builder
 @NoArgsConstructor
@@ -24,4 +23,7 @@ public class EventShortDto {
     private Boolean paid;
     private String title;
     private Long views;
+
+    @Builder.Default
+    private Long commentsCount = 0L;
 }
