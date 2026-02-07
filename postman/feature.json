@@ -156,6 +156,21 @@
           "name": "1.4 Создать событие",
           "event": [
             {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "console.log('Creating event with user ID:', pm.environment.get('regular_user_id'));",
+                  "console.log('Category ID:', pm.environment.get('category_id'));",
+                  "const now = new Date();",
+                  "const futureDate = new Date(now.getTime() + 3 * 24 * 60 * 60 * 1000); // +3 дня",
+                  "const eventDateStr = futureDate.toISOString().replace('T', ' ').substring(0, 19);",
+                  "pm.environment.set('event_date', eventDateStr);",
+                  "console.log('Event date will be:', eventDateStr);"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
               "listen": "test",
               "script": {
                 "exec": [
@@ -168,17 +183,8 @@
                   "    pm.environment.set('event_id', jsonData.id);",
                   "    pm.environment.set('event_state', jsonData.state);",
                   "    console.log('Event created with ID:', jsonData.id, 'State:', jsonData.state);",
+                  "    console.log('event_id saved as:', pm.environment.get('event_id'));",
                   "});"
-                ],
-                "type": "text/javascript"
-              }
-            },
-            {
-              "listen": "prerequest",
-              "script": {
-                "exec": [
-                  "console.log('Creating event with user ID:', pm.environment.get('regular_user_id'));",
-                  "console.log('Category ID:', pm.environment.get('category_id'));"
                 ],
                 "type": "text/javascript"
               }
@@ -194,7 +200,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"annotation\": \"Тестовое событие для комментариев создано {{timestamp}}\",\n  \"category\": {{category_id}},\n  \"description\": \"Подробное описание тестового события. Это событие создано для тестирования функциональности комментариев.\",\n  \"eventDate\": \"2024-12-31 20:00:00\",\n  \"location\": {\n    \"lat\": 55.751244,\n    \"lon\": 37.618423\n  },\n  \"paid\": false,\n  \"participantLimit\": 100,\n  \"requestModeration\": true,\n  \"title\": \"Тестовое событие {{timestamp}}\"\n}"
+              "raw": "{\n  \"annotation\": \"Тестовое событие для комментариев создано {{timestamp}}\",\n  \"category\": {{category_id}},\n  \"description\": \"Подробное описание тестового события. Это событие создано для тестирования функциональности комментариев.\",\n  \"eventDate\": \"{{event_date}}\",\n  \"location\": {\n    \"lat\": 55.751244,\n    \"lon\": 37.618423\n  },\n  \"paid\": false,\n  \"participantLimit\": 100,\n  \"requestModeration\": true,\n  \"title\": \"Тестовое событие {{timestamp}}\"\n}"
             },
             "url": {
               "raw": "{{base_url}}/users/{{regular_user_id}}/events",
