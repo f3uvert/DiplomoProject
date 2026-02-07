@@ -1,45 +1,69 @@
-version: '3.8'
-
 services:
-  stats-db:
+  ewm-db:
     image: postgres:14-alpine
-    container_name: stats-postgres
+    container_name: ewm-db
     environment:
-      POSTGRES_DB: stats
+      POSTGRES_DB: ewm_main_db
       POSTGRES_USER: admin
       POSTGRES_PASSWORD: password
     ports:
       - "5432:5432"
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U admin"]
-      interval: 10s
+      interval: 5s
       timeout: 5s
       retries: 5
+      start_period: 10s
 
-  stats-service:
-    build:
-      context: ./stats-service/stats-server
-      dockerfile: Dockerfile
-    container_name: stats-service
-    ports:
-      - "9090:9090"
+  stats-db:
+    image: postgres:14-alpine
+    container_name: stats-db
     environment:
-      DB_HOST: stats-db
-      DB_PORT: 5432
-      DB_NAME: stats
-      DB_USER: admin
-      DB_PASSWORD: password
-      SPRING_PROFILES_ACTIVE: prod
-    depends_on:
-      stats-db:
-        condition: service_healthy
+      POSTGRES_DB: ewm_stats_db
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: password
+    ports:
+      - "5433:5432"
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:9090/actuator/health"]
-      interval: 30s
-      timeout: 10s
+      test: ["CMD-SHELL", "pg_isready -U admin"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  stats-server:
+    build:
+      context: .
+      dockerfile: docker/stats-server/Dockerfile
+    container_name: stats-server
+    ports:
+      - "9090:9090"  # Spring Boot порт
+    # НЕ зависит от базы!
+    environment:
+      # Принудительно указываем порт
+      SERVER_PORT: 9090
+      SERVER_ADDRESS: 0.0.0.0
+    # Простой healthcheck
+    healthcheck:
+      test: [ "CMD-SHELL", "curl -f http://127.0.0.1:9090/actuator/health || exit 1" ]
+      interval: 10s
+      timeout: 5s
       retries: 3
 
-volumes:
-  postgres_data:
+  ewm-main-service:
+    build:
+      context: .  # корень проекта
+      dockerfile: docker/main-service/Dockerfile
+    container_name: ewm-main-service
+    ports:
+      - "8080:8080"
+    depends_on:
+      ewm-db:
+        condition: service_healthy
+      stats-server:
+        condition: service_started
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://ewm-db:5432/ewm_main_db
+      SPRING_DATASOURCE_USERNAME: admin
+      SPRING_DATASOURCE_PASSWORD: password
+      STATS_SERVER_URL: http://stats-server:9090
