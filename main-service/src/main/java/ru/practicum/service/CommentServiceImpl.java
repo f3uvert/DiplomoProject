@@ -34,7 +34,7 @@ public class CommentServiceImpl implements CommentService {
     private final EventRepository eventRepository;
     private final CommentMapper commentMapper;
 
-    @Value("${comment.moderation.enabled:true}")
+    @Value("${comment.moderation.enabled:false}")
     private boolean moderationEnabled;
 
     @Value("${comment.reply-depth.max:1}")
