@@ -9,7 +9,7 @@ import org.springframework.stereotype.Component;
 @ConfigurationProperties(prefix = "comment")
 public class CommentProperties {
 
-    private boolean moderationEnabled = true;
+    private boolean moderationEnabled = false;
     private int maxLength = 2000;
     private int minLength = 10;
     private int replyDepthMax = 1;
