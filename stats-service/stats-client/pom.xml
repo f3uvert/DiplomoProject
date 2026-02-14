@@ -5,7 +5,6 @@
          http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
 
-    <!-- Каждый модуль должен иметь Spring Boot parent -->
     <parent>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-starter-parent</artifactId>
@@ -18,18 +17,15 @@
     <version>0.0.1-SNAPSHOT</version>
 
     <dependencies>
-        <!-- Наши модули -->
         <dependency>
             <groupId>ru.practicum</groupId>
             <artifactId>stats-dto</artifactId>
             <version>0.0.1-SNAPSHOT</version>
         </dependency>
 
-        <!-- Spring Web для RestTemplate -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-web</artifactId>
-            <!-- Исключаем Tomcat, так как это не веб-приложение -->
             <exclusions>
                 <exclusion>
                     <groupId>org.springframework.boot</groupId>

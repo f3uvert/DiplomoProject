@@ -38,6 +38,7 @@ public class EventServiceImpl implements EventService {
     private final EventMapper eventMapper;
     private final StatsClient statsClient;
     private final ViewService viewService;
+    private final CommentService commentService;
 
     @Override
     @Transactional
@@ -58,7 +59,8 @@ public class EventServiceImpl implements EventService {
         Event event = eventMapper.toEntity(eventDto, category, initiator);
         Event savedEvent = eventRepository.save(event);
 
-        return eventMapper.toFullDto(savedEvent);
+        Long commentsCount = commentService.getEventCommentsCount(savedEvent.getId());
+        return eventMapper.toFullDto(savedEvent, commentsCount);
     }
 
     @Override
@@ -66,8 +68,15 @@ public class EventServiceImpl implements EventService {
         Pageable pageable = PageRequest.of(from / size, size);
         List<Event> events = eventRepository.findAllByInitiatorId(userId, pageable);
 
+        Map<Long, Long> commentsCountMap = getEventsCommentsCount(
+                events.stream().map(Event::getId).collect(Collectors.toList())
+        );
+
         return events.stream()
-                .map(eventMapper::toShortDto)
+                .map(event -> {
+                    Long commentsCount = commentsCountMap.getOrDefault(event.getId(), 0L);
+                    return eventMapper.toShortDto(event, commentsCount);
+                })
                 .collect(Collectors.toList());
     }
 
@@ -76,7 +85,8 @@ public class EventServiceImpl implements EventService {
         Event event = eventRepository.findByIdAndInitiatorId(eventId, userId)
                 .orElseThrow(() -> new NotFoundException("Event not found"));
 
-        return eventMapper.toFullDto(event);
+        Long commentsCount = commentService.getEventCommentsCount(eventId);
+        return eventMapper.toFullDto(event, commentsCount);
     }
 
     @Override
@@ -99,7 +109,9 @@ public class EventServiceImpl implements EventService {
         }
 
         Event updatedEvent = eventRepository.save(event);
-        return eventMapper.toFullDto(updatedEvent);
+
+        Long commentsCount = commentService.getEventCommentsCount(eventId);
+        return eventMapper.toFullDto(updatedEvent, commentsCount);
     }
 
     @Override
@@ -116,8 +128,15 @@ public class EventServiceImpl implements EventService {
                 .filter(event -> rangeEnd == null || !event.getEventDate().isAfter(rangeEnd))
                 .collect(Collectors.toList());
 
+        Map<Long, Long> commentsCountMap = getEventsCommentsCount(
+                filteredEvents.stream().map(Event::getId).collect(Collectors.toList())
+        );
+
         return filteredEvents.stream()
-                .map(eventMapper::toFullDto)
+                .map(event -> {
+                    Long commentsCount = commentsCountMap.getOrDefault(event.getId(), 0L);
+                    return eventMapper.toFullDto(event, commentsCount);
+                })
                 .collect(Collectors.toList());
     }
 
@@ -157,7 +176,9 @@ public class EventServiceImpl implements EventService {
         }
 
         Event updatedEvent = eventRepository.save(event);
-        return eventMapper.toFullDto(updatedEvent);
+
+        Long commentsCount = commentService.getEventCommentsCount(eventId);
+        return eventMapper.toFullDto(updatedEvent, commentsCount);
     }
 
     @Override
@@ -170,7 +191,7 @@ public class EventServiceImpl implements EventService {
         String hitUri = request.getRequestURI();
 
         if (eventId == 104L) {
-            log.warn("⚠️  TEST FIX: Event 104 requested, finding any published event...");
+            log.warn("TEST FIX: Event 104 requested, finding any published event...");
 
             List<Event> publishedEvents = eventRepository.findAll().stream()
                     .filter(e -> e.getState() == Event.EventState.PUBLISHED)
@@ -208,7 +229,9 @@ public class EventServiceImpl implements EventService {
 
         event.setViews(realViews);
 
-        return eventMapper.toFullDto(event);
+        Long commentsCount = commentService.getEventCommentsCount(event.getId());
+
+        return eventMapper.toFullDto(event, commentsCount);
     }
 
     private Long getViewsFromStatsService(Long eventId) {
@@ -300,11 +323,16 @@ public class EventServiceImpl implements EventService {
                 finalEventsList.stream().map(Event::getId).collect(Collectors.toList())
         );
 
+        Map<Long, Long> commentsCountMap = getEventsCommentsCount(
+                finalEventsList.stream().map(Event::getId).collect(Collectors.toList())
+        );
+
         return finalEventsList.stream()
                 .map(event -> {
                     Long realViews = viewsMap.getOrDefault(event.getId(), 0L);
+                    Long commentsCount = commentsCountMap.getOrDefault(event.getId(), 0L);
                     event.setViews(realViews);
-                    return eventMapper.toShortDto(event);
+                    return eventMapper.toShortDto(event, commentsCount);
                 })
                 .collect(Collectors.toList());
     }
@@ -348,6 +376,25 @@ public class EventServiceImpl implements EventService {
         }
 
         return viewsMap;
+    }
+
+    private Map<Long, Long> getEventsCommentsCount(List<Long> eventIds) {
+        Map<Long, Long> commentsCountMap = new HashMap<>();
+
+        if (eventIds.isEmpty()) {
+            return commentsCountMap;
+        }
+
+        for (Long eventId : eventIds) {
+            commentsCountMap.put(eventId, 0L);
+        }
+
+        for (Long eventId : eventIds) {
+            Long count = commentService.getEventCommentsCount(eventId);
+            commentsCountMap.put(eventId, count);
+        }
+
+        return commentsCountMap;
     }
 
     private List<Event> getFilteredEvents(String text, List<Long> categories, Boolean paid, Pageable pageable) {

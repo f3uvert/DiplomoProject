@@ -20,5 +20,4 @@
         <module>stats-server</module>
     </modules>
 
-    <!-- Без зависимостей в этом файле -->
 </project>

@@ -1,2 +1,4 @@
 # java-explore-with-me
-Template repository for ExploreWithMe project.
+
+https://github.com/f3uvert/DiplomoProject/pull/3
+
